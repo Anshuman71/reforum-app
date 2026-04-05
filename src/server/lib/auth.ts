@@ -1,10 +1,10 @@
+import '@/server/features'; // Ensure hooks are registered before any auth events fire
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
 import { db } from '@/server/db';
-import { users } from '@/server/db/schema';
-import { eq } from 'drizzle-orm';
 import { newId } from '@/server/lib/id';
+import { emitAfterEvent } from '@/server/lib/events';
 
 export const auth = betterAuth({
   rateLimit: {
@@ -30,13 +30,12 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          const adminEmail = process.env.ADMIN_EMAIL;
-          if (adminEmail && user.email === adminEmail) {
-            await db
-              .update(users)
-              .set({ role: 'admin' })
-              .where(eq(users.id, user.id));
-          }
+          // Thin bridge: emit event, all logic lives in feature registrations
+          emitAfterEvent('user:afterSignup', {
+            user: user as any,
+            actor: { id: user.id, role: 'user' },
+            meta: {},
+          });
         },
       },
     },

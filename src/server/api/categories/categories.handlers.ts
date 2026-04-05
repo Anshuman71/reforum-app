@@ -14,6 +14,7 @@ import * as HttpStatusCodes from 'stoker/http-status-codes';
 import * as HttpStatusPhrases from 'stoker/http-status-phrases';
 import { categories } from '@/server/db/schema';
 import { ReforumApiError } from '@/server/errors';
+import { emitBeforeEvent, emitAfterEvent } from '@/server/lib/events';
 
 export const create: AppRouteHandler<CreateRoute> = async c => {
   const data = c.req.valid('json');
@@ -26,15 +27,25 @@ export const create: AppRouteHandler<CreateRoute> = async c => {
     });
   }
 
+  const actor = { id: user.id, role: user.role };
+
+  const ctx = await emitBeforeEvent('category:beforeCreate', {
+    data: { name: data.name, description: data.description, isPrivate: data.isPrivate },
+    actor,
+    meta: {},
+  });
+
   const categoryId = newId('category');
 
   const [category] = await db
     .insert(categories)
     .values({
       id: categoryId,
-      ...data,
+      ...ctx.data,
     })
     .returning();
+
+  emitAfterEvent('category:afterCreate', { entity: category, actor, meta: {} });
 
   return c.json(category, HttpStatusCodes.CREATED);
 };
@@ -76,36 +87,65 @@ export const get: AppRouteHandler<GetRoute> = async c => {
 export const update: AppRouteHandler<UpdateRoute> = async c => {
   const { id } = c.req.valid('param');
   const data = c.req.valid('json');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
 
-  const [comment] = await db
-    .update(categories)
-    .set(data)
-    .where(eq(categories.id, id))
-    .returning();
+  const existing = await db.query.categories.findFirst({
+    where: eq(categories.id, id),
+  });
 
-  if (!comment) {
+  if (!existing) {
     throw new ReforumApiError({
       message: HttpStatusPhrases.NOT_FOUND,
       code: 'NOT_FOUND',
     });
   }
 
-  return c.json(comment, HttpStatusCodes.OK);
+  const ctx = await emitBeforeEvent('category:beforeUpdate', {
+    entity: existing,
+    data: { name: data.name, description: data.description, isPrivate: data.isPrivate },
+    actor,
+    meta: {},
+  });
+
+  const [category] = await db
+    .update(categories)
+    .set(ctx.data)
+    .where(eq(categories.id, id))
+    .returning();
+
+  emitAfterEvent('category:afterUpdate', { entity: category, actor, meta: {} });
+
+  return c.json(category, HttpStatusCodes.OK);
 };
 
 export const remove: AppRouteHandler<DeleteRoute> = async c => {
   const data = c.req.valid('param');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
 
-  const result = await db
-    .delete(categories)
-    .where(eq(categories.id, data.id));
+  const existing = await db.query.categories.findFirst({
+    where: eq(categories.id, data.id),
+  });
 
-  if (result.count === 0) {
+  if (!existing) {
     throw new ReforumApiError({
       message: HttpStatusPhrases.NOT_FOUND,
       code: 'NOT_FOUND',
     });
   }
+
+  await emitBeforeEvent('category:beforeDelete', {
+    entity: existing,
+    actor,
+    meta: {},
+  });
+
+  await db
+    .delete(categories)
+    .where(eq(categories.id, data.id));
+
+  emitAfterEvent('category:afterDelete', { entity: existing, actor, meta: {} });
 
   return c.body(null, HttpStatusCodes.NO_CONTENT);
 };

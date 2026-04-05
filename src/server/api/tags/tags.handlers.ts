@@ -17,6 +17,7 @@ import { tags, posts, postTags } from '@/server/db/schema';
 import { ReforumApiError } from '@/server/errors';
 import slugify from 'slugify';
 import { isAuthorized } from '@/server/api-auth';
+import { emitBeforeEvent, emitAfterEvent } from '@/server/lib/events';
 
 export const list: AppRouteHandler<ListRoute> = async c => {
   const queries = c.req.valid('query');
@@ -34,15 +35,26 @@ export const list: AppRouteHandler<ListRoute> = async c => {
 export const create: AppRouteHandler<CreateRoute> = async c => {
   await isAuthorized(c);
   const data = c.req.valid('json');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+
+  const ctx = await emitBeforeEvent('tag:beforeCreate', {
+    data: { name: data.name },
+    actor,
+    meta: {},
+  });
+
   const tagId = newId('tag');
 
   const [tag] = await db
     .insert(tags)
     .values({
       id: tagId,
-      name: data.name,
+      name: ctx.data.name,
     })
     .returning();
+
+  emitAfterEvent('tag:afterCreate', { entity: tag, actor, meta: {} });
 
   return c.json(tag, HttpStatusCodes.CREATED);
 };
@@ -67,14 +79,14 @@ export const get: AppRouteHandler<GetRoute> = async c => {
 export const update: AppRouteHandler<UpdateRoute> = async c => {
   const data = c.req.valid('param');
   const { name } = c.req.valid('json');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
 
-  const [tag] = await db
-    .update(tags)
-    .set({ name })
-    .where(eq(tags.id, data.id))
-    .returning();
+  const existing = await db.query.tags.findFirst({
+    where: eq(tags.id, data.id),
+  });
 
-  if (!tag) {
+  if (!existing) {
     return c.json(
       {
         message: HttpStatusPhrases.NOT_FOUND,
@@ -82,18 +94,35 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
       HttpStatusCodes.NOT_FOUND
     );
   }
+
+  const ctx = await emitBeforeEvent('tag:beforeUpdate', {
+    entity: existing,
+    data: { name },
+    actor,
+    meta: {},
+  });
+
+  const [tag] = await db
+    .update(tags)
+    .set({ name: ctx.data.name })
+    .where(eq(tags.id, data.id))
+    .returning();
+
+  emitAfterEvent('tag:afterUpdate', { entity: tag, actor, meta: {} });
 
   return c.json(tag, HttpStatusCodes.OK);
 };
 
 export const deleteById: AppRouteHandler<DeleteRoute> = async c => {
   const data = c.req.valid('param');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
 
-  const result = await db
-    .delete(tags)
-    .where(eq(tags.id, data.id));
+  const existing = await db.query.tags.findFirst({
+    where: eq(tags.id, data.id),
+  });
 
-  if (result.count === 0) {
+  if (!existing) {
     return c.json(
       {
         message: HttpStatusPhrases.NOT_FOUND,
@@ -101,6 +130,18 @@ export const deleteById: AppRouteHandler<DeleteRoute> = async c => {
       HttpStatusCodes.NOT_FOUND
     );
   }
+
+  await emitBeforeEvent('tag:beforeDelete', {
+    entity: existing,
+    actor,
+    meta: {},
+  });
+
+  await db
+    .delete(tags)
+    .where(eq(tags.id, data.id));
+
+  emitAfterEvent('tag:afterDelete', { entity: existing, actor, meta: {} });
 
   return c.body(null, HttpStatusCodes.NO_CONTENT);
 };
