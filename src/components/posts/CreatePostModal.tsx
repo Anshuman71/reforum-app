@@ -52,8 +52,8 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
     if (open) {
       client.categories
         .$get({ query: {} })
-        .then(res => res.json())
-        .then(data => {
+        .then(async (res) => {
+          const data = await res.json();
           if (Array.isArray(data)) {
             setCategories(data as Category[]);
           }
@@ -100,10 +100,8 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(
-          'error' in error ? error.error.message : 'Failed to create post'
-        );
+        const errorData: any = await res.json();
+        throw new Error(errorData?.error?.message ?? 'Failed to create post');
       }
 
       setFormData({ title: '', content: '', categoryId: '' });

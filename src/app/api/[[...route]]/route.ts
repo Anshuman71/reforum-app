@@ -1,3 +1,4 @@
+import { adminRouter } from '@/server/api/admin/admin.index';
 import { categoriesRouter } from '@/server/api/categories/categories.index';
 import { commentsRouter } from '@/server/api/comments/comments.index';
 import configureOpenAPI from '@/server/common/configure-open-api';
@@ -9,6 +10,7 @@ import { handle } from 'hono/vercel';
 const app = createApp();
 
 const routes = [
+  adminRouter,
   postsRouter,
   commentsRouter,
   categoriesRouter,

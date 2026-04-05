@@ -35,6 +35,7 @@ import {
   User,
   Crown,
 } from 'lucide-react';
+import { client } from '@/app/client-utils/react-query';
 interface ForumUser {
   id: string;
   email: string;
@@ -57,10 +58,10 @@ export default function UsersSettingsPage() {
   const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/admin/users');
+      const res = await client.admin.users.$get({ query: {} });
       if (res.ok) {
         const data = await res.json();
-        setUsers(data);
+        setUsers(data as ForumUser[]);
       }
     } catch (err) {
       console.error('Failed to load users:', err);
@@ -81,10 +82,8 @@ export default function UsersSettingsPage() {
 
   const handleChangeRole = async (userId: string, newRole: ForumUser['role']) => {
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role: newRole }),
+      const res = await client.admin.users.role.$patch({
+        json: { userId, role: newRole },
       });
 
       if (res.ok) {

@@ -86,10 +86,8 @@ export default function CategoriesSettingsPage() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(
-          'error' in errorData ? errorData.error.message : 'Failed to create category'
-        );
+        const errorData: any = await res.json();
+        throw new Error(errorData?.error?.message ?? 'Failed to create category');
       }
 
       setSuccess('Category created successfully!');
