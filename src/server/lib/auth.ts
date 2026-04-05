@@ -1,4 +1,4 @@
-import '@/server/features'; // Ensure hooks are registered before any auth events fire
+import '@/server/init';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';

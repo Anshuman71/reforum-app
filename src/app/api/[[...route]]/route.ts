@@ -1,4 +1,4 @@
-import '@/server/features'; // Ensure hooks are registered before any request
+import '@/server/init';
 import { adminRouter } from '@/server/api/admin/admin.index';
 import { categoriesRouter } from '@/server/api/categories/categories.index';
 import { commentsRouter } from '@/server/api/comments/comments.index';
