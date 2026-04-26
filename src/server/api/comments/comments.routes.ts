@@ -5,19 +5,33 @@ import { createErrorSchema } from 'stoker/openapi/schemas';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { comments } from '@/server/db/schema';
 import {
-  commonInsertOmitFields,
   getIdParamsSchema,
 } from '@/server/common/constants';
 import { authMiddleware } from '@/server/common/middlewares';
 import { openApiErrorResponses } from '@/server/errors';
 
 const IdParamsSchema = getIdParamsSchema('comment');
+const PostIdSchema = getIdParamsSchema('post').shape.id;
 
 export const commentsSelectSchema = createSelectSchema(comments);
+const CommentAuthorSchema = z.object({
+  id: getIdParamsSchema('user').shape.id,
+  name: z.string(),
+  image: z.string().nullable(),
+});
+const commentReplySchema = z.object({
+  id: IdParamsSchema.shape.id,
+  content: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  replyToCommentId: IdParamsSchema.shape.id.nullable(),
+  author: CommentAuthorSchema,
+});
 
-const commentsCreateSchema = createInsertSchema(comments).omit({
-  ...commonInsertOmitFields,
-  state: true,
+const commentsCreateSchema = z.object({
+  postId: PostIdSchema,
+  content: z.string().min(1).max(50000),
+  replyToCommentId: getIdParamsSchema('comment').shape.id.optional().nullable(),
 });
 
 const commentsUpdateSchema = createInsertSchema(comments).pick({
@@ -40,7 +54,7 @@ export const create = createRoute({
   },
   responses: {
     [HttpStatusCodes.CREATED]: jsonContent(
-      commentsSelectSchema,
+      commentReplySchema,
       'The created comment'
     ),
     [HttpStatusCodes.UNPROCESSABLE_ENTITY]: jsonContent(

@@ -1,8 +1,10 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+import { getEnvs } from '@/server/lib/envs';
 
-const connectionString = String(process.env.DATABASE_URL);
+const envs = getEnvs();
+const connectionString = envs.DATABASE_URL;
 
 // prepare: false is required when using connection poolers (e.g., PgBouncer, Supabase pooler)
 // It's safe to leave enabled for direct connections too

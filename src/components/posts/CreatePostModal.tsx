@@ -94,7 +94,6 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
           title: formData.title.trim(),
           content: formData.content.trim(),
           categoryId: formData.categoryId,
-          authorId: session.user.id,
           tags: [],
         },
       });

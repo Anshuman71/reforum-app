@@ -4,6 +4,7 @@ import { db } from '@/server/db';
 import {
   CreateRoute,
   DeleteByIdRoute,
+  GetRoute,
   ListCommentsRoute,
   ListRoute,
   UpdateByIdRoute,
@@ -11,213 +12,114 @@ import {
   AddPostTagRoute,
   RemovePostTagRoute,
 } from './posts.routes';
-import {
-  comments,
-  posts,
-  postTags,
-  tags as tagsTable,
-} from '@/server/db/schema';
+import { posts, postTags, tags as tagsTable } from '@/server/db/schema';
 import { newId } from '@/server/lib/id';
 import { and, eq } from 'drizzle-orm';
 import * as HttpStatusCodes from 'stoker/http-status-codes';
-import * as HttpStatusPhrases from 'stoker/http-status-phrases';
-import slugify from 'slugify';
 import { ReforumApiError } from '@/server/errors';
-import { emitBeforeEvent, emitAfterEvent } from '@/server/lib/events';
-
-function slugifyPost<P extends { title: string }>(p: P): P & { slug: string } {
-  return {
-    ...p,
-    slug: slugify(p.title, { lower: true }),
-  };
-}
+import {
+  createPost,
+  deletePost,
+  getThread,
+  listPosts,
+  listThreadComments,
+  updatePost,
+} from '@/server/services/forum';
 
 export const list: AppRouteHandler<ListRoute> = async c => {
   const queries = c.req.valid('query');
   const user = c.get('user');
-  console.log({ user });
   const actor = user ? { id: user.id, role: user.role } : null;
-  const postsRes = await db.query.posts.findMany({
-    limit: Number(queries.limit ?? 20),
+
+  const page = await listPosts({
+    actor,
+    limit: queries.limit,
+    cursor: queries.cursor,
   });
 
-  emitAfterEvent('post:afterList', { entities: postsRes, actor, meta: {} });
-
-  return c.json(
-    postsRes.map(p => slugifyPost(p)),
-    HttpStatusCodes.OK
-  );
+  return c.json(page, HttpStatusCodes.OK);
 };
 
 export const create: AppRouteHandler<CreateRoute> = async c => {
   const data = c.req.valid('json');
   const user = c.get('user');
-  console.log({ user });
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const actor = user ? { id: user.id, role: user.role } : null;
 
-  const ctx = await emitBeforeEvent('post:beforeCreate', {
-    data: { title: data.title, content: data.content, authorId: data.authorId, categoryId: data.categoryId, tags: data.tags },
+  const post = await createPost({
     actor,
-    meta: {},
+    title: data.title,
+    content: data.content,
+    categoryId: data.categoryId,
+    tags: data.tags,
   });
 
-  const postId = newId('post');
+  return c.json(post, HttpStatusCodes.CREATED);
+};
 
-  const post = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(posts).values({
-      id: postId,
-      title: ctx.data.title,
-      slug: slugify(ctx.data.title, { lower: true, strict: true }),
-      authorId: ctx.data.authorId,
-      categoryId: ctx.data.categoryId,
-    }).returning();
+export const get: AppRouteHandler<GetRoute> = async c => {
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : null;
 
-    await tx.insert(comments).values({
-      id: newId('comment'),
-      postId: postId,
-      authorId: ctx.data.authorId,
-      content: ctx.data.content,
-    });
+  const thread = await getThread(id, actor);
 
-    if (ctx.data.tags.length) {
-      await tx.insert(postTags).values(
-        ctx.data.tags.map(tag => ({
-          id: newId('post_tag'),
-          postId: postId,
-          tagId: tag,
-        }))
-      );
-    }
-
-    return created;
-  });
-
-  if (!post) {
-    return c.json(
-      {
-        message: HttpStatusPhrases.UNPROCESSABLE_ENTITY,
-      },
-      HttpStatusCodes.UNPROCESSABLE_ENTITY
-    );
-  }
-
-  emitAfterEvent('post:afterCreate', { entity: post, actor, meta: {} });
-
-  return c.json(slugifyPost(post), HttpStatusCodes.CREATED);
+  return c.json(thread, HttpStatusCodes.OK);
 };
 
 export const listComments: AppRouteHandler<ListCommentsRoute> = async c => {
-  const id = c.req.param('id');
-  const commentsRes = await db.query.comments.findMany({
-    where: eq(comments.postId, id),
+  const { id } = c.req.valid('param');
+  const queries = c.req.valid('query');
+  const user = c.get('user');
+  const actor = user ? { id: user.id, role: user.role } : null;
+
+  const page = await listThreadComments({
+    postId: id,
+    actor,
+    limit: queries.limit,
+    cursor: queries.cursor,
   });
 
-  return c.json(commentsRes, HttpStatusCodes.OK);
+  return c.json(page, HttpStatusCodes.OK);
 };
 
 export const update: AppRouteHandler<UpdateByIdRoute> = async c => {
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
   const data = c.req.valid('json');
   const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const actor = user ? { id: user.id, role: user.role } : null;
 
-  const existing = await db.query.posts.findFirst({
-    where: eq(posts.id, id),
-  });
-
-  if (!existing) {
-    throw new ReforumApiError({
-      message: HttpStatusPhrases.NOT_FOUND,
-      code: 'NOT_FOUND',
-    });
-  }
-
-  const ctx = await emitBeforeEvent('post:beforeUpdate', {
-    entity: existing,
-    data: { title: data.title, categoryId: data.categoryId, tags: data.tags },
+  const post = await updatePost({
+    id,
     actor,
-    meta: {},
+    title: data.title,
+    categoryId: data.categoryId,
+    tags: data.tags,
   });
 
-  const updatedPost: { title?: string; categoryId?: string } = {};
-
-  if (ctx.data.title) {
-    updatedPost.title = ctx.data.title;
-  }
-
-  if (ctx.data.categoryId) {
-    updatedPost.categoryId = ctx.data.categoryId;
-  }
-
-  const [post] = await db
-    .update(posts)
-    .set(updatedPost)
-    .where(eq(posts.id, id))
-    .returning();
-
-  if (ctx.data.tags) {
-    await db.delete(postTags).where(eq(postTags.postId, id));
-    await db.insert(postTags).values(
-      ctx.data.tags.map(tag => ({
-        id: newId('post_tag'),
-        postId: id,
-        tagId: tag,
-      }))
-    );
-  }
-
-  emitAfterEvent('post:afterUpdate', { entity: post, actor, meta: {} });
-
-  return c.json(slugifyPost(post), HttpStatusCodes.OK);
+  return c.json(post, HttpStatusCodes.OK);
 };
 
 export const remove: AppRouteHandler<DeleteByIdRoute> = async c => {
-  const id = c.req.param('id');
+  const { id } = c.req.valid('param');
   const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const actor = user ? { id: user.id, role: user.role } : null;
 
-  const existing = await db.query.posts.findFirst({
-    where: eq(posts.id, id),
-  });
+  await deletePost({ id, actor });
 
-  if (!existing) {
-    return c.json(
-      {
-        message: HttpStatusPhrases.NOT_FOUND,
-      },
-      HttpStatusCodes.NOT_FOUND
-    );
-  }
-
-  await emitBeforeEvent('post:beforeDelete', {
-    entity: existing,
-    actor,
-    meta: {},
-  });
-
-  const result = await db
-    .update(posts)
-    .set({ state: 'deleted' })
-    .where(eq(posts.id, id));
-
-  emitAfterEvent('post:afterDelete', { entity: existing, actor, meta: {} });
-
-  return c.json(result, HttpStatusCodes.OK);
+  return c.body(null, HttpStatusCodes.NO_CONTENT);
 };
 
-// PostTags handlers
 export const listPostTags: AppRouteHandler<ListPostTagsRoute> = async c => {
   const { id: postId } = c.req.valid('param');
   const queries = c.req.valid('query');
 
-  // Check if post exists
   const post = await db.query.posts.findFirst({
     where: eq(posts.id, postId),
   });
 
   if (!post) {
     throw new ReforumApiError({
-      message: HttpStatusPhrases.NOT_FOUND,
+      message: 'Post not found',
       code: 'NOT_FOUND',
     });
   }
@@ -238,19 +140,17 @@ export const addPostTag: AppRouteHandler<AddPostTagRoute> = async c => {
   const { id: postId } = c.req.valid('param');
   const { tagId } = c.req.valid('json');
 
-  // Check if post exists
   const post = await db.query.posts.findFirst({
     where: eq(posts.id, postId),
   });
 
   if (!post) {
     throw new ReforumApiError({
-      message: HttpStatusPhrases.NOT_FOUND,
+      message: 'Post not found',
       code: 'NOT_FOUND',
     });
   }
 
-  // Check if tag exists
   const tag = await db.query.tags.findFirst({
     where: eq(tagsTable.id, tagId),
   });
@@ -262,7 +162,6 @@ export const addPostTag: AppRouteHandler<AddPostTagRoute> = async c => {
     });
   }
 
-  // Check if relationship already exists
   const existingRelation = await db.query.postTags.findFirst({
     where: and(eq(postTags.postId, postId), eq(postTags.tagId, tagId)),
   });
@@ -282,7 +181,6 @@ export const addPostTag: AppRouteHandler<AddPostTagRoute> = async c => {
     tagId,
   });
 
-  // Fetch the created relationship with tag details
   const postTagWithTag = await db.query.postTags.findFirst({
     where: eq(postTags.id, postTagId),
     with: {
@@ -296,7 +194,6 @@ export const addPostTag: AppRouteHandler<AddPostTagRoute> = async c => {
 export const removePostTag: AppRouteHandler<RemovePostTagRoute> = async c => {
   const { postId, tagId } = c.req.valid('param');
 
-  // Check if post exists
   const post = await db.query.posts.findFirst({
     where: eq(posts.id, postId),
   });

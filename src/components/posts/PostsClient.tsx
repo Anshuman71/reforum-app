@@ -14,5 +14,5 @@ export function PostsPageClient() {
 
   if (error) return <div>{error.message}</div>;
 
-  return <PostsList posts={data} />;
+  return <PostsList posts={data.items} nextCursor={data.nextCursor} />;
 }

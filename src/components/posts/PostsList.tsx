@@ -5,7 +5,8 @@ import { PostCard } from './PostCard';
 import { InferResponseType } from 'hono/client';
 
 interface PostsListProps {
-  posts: InferResponseType<typeof client.posts.$get, 200>;
+  posts: InferResponseType<typeof client.posts.$get, 200>['items'];
+  nextCursor?: InferResponseType<typeof client.posts.$get, 200>['nextCursor'];
   loading?: boolean;
 }
 
@@ -50,8 +51,8 @@ export function PostsList({ posts, loading = false }: PostsListProps) {
         <PostCard
           key={postData.id}
           post={postData}
-          author={{ id: postData.authorId, name: 'pikachu' }}
-          commentsCount={44}
+          author={postData.author}
+          commentsCount={postData.commentsCount}
         />
       ))}
     </div>

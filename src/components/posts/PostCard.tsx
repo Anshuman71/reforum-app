@@ -12,11 +12,11 @@ import BoaringAvatar from 'boring-avatars';
 interface Author {
   id: string;
   name: string;
-  image?: string;
+  image?: string | null;
 }
 
 interface PostCardProps {
-  post: InferResponseType<typeof client.posts.$get, 200>[number];
+  post: InferResponseType<typeof client.posts.$get, 200>['items'][number];
   author: Author;
   commentsCount: number;
 }
@@ -30,7 +30,7 @@ export function PostCard({ post, author, commentsCount }: PostCardProps) {
             {/* User Avatar */}
             <div className="col-span-1">
               <Avatar className="h-10 w-10 flex-shrink-0">
-                <AvatarImage src={author.image} alt={author.name} />
+                <AvatarImage src={author.image ?? undefined} alt={author.name} />
                 <AvatarFallback>
                   <BoaringAvatar variant="marble" name={author.id} size={32} />
                 </AvatarFallback>

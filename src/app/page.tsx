@@ -12,7 +12,10 @@ export default async function PostsPage() {
 
   void queryClient.prefetchQuery({
     queryKey: [QUERY_KEYS.posts],
-    queryFn: () => getPosts({ cookie: fwHeaders.get('cookie') ?? '' }),
+    queryFn: () =>
+      getPosts({
+        headers: { cookie: fwHeaders.get('cookie') ?? '' },
+      }),
   });
 
   return (

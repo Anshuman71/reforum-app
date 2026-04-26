@@ -10,45 +10,87 @@ import {
   getIdParamsSchema,
   notFoundSchema,
 } from '@/server/common/constants';
-import { commentsSelectSchema } from '../comments/comments.routes';
 import { authMiddleware } from '@/server/common/middlewares';
 import { openApiErrorResponses } from '@/server/errors';
 
 const tags = ['Posts'];
-
 const IdParamsSchema = getIdParamsSchema('post');
 
-const PostSelectSchema = createSelectSchema(posts).extend({
-    slug: z.string(),
+const PublicUserSchema = z.object({
+  id: createIdValidator('user'),
+  name: z.string(),
+  image: z.string().nullable(),
+});
+
+const CategorySummarySchema = z.object({
+  id: createIdValidator('category'),
+  name: z.string(),
+  isPrivate: z.boolean(),
+});
+
+const FeedPostSchema = z.object({
+  id: createIdValidator('post'),
+  title: z.string(),
+  slug: z.string(),
+  state: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  isPinned: z.boolean(),
+  pinnedAt: z.union([z.string(), z.date(), z.null()]),
+  author: PublicUserSchema,
+  category: CategorySummarySchema,
+  commentsCount: z.number().int().nonnegative(),
+});
+
+const ThreadBodySchema = z.object({
+  id: createIdValidator('comment'),
+  content: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  author: PublicUserSchema,
+});
+
+const ThreadPostSchema = z.object({
+  id: createIdValidator('post'),
+  title: z.string(),
+  slug: z.string(),
+  state: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  author: PublicUserSchema,
+  category: CategorySummarySchema,
+  body: ThreadBodySchema.nullable(),
+  repliesCount: z.number().int().nonnegative(),
+});
+
+const ThreadReplySchema = z.object({
+  id: createIdValidator('comment'),
+  content: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  replyToCommentId: createIdValidator('comment').nullable(),
+  author: PublicUserSchema,
+});
+
+const CursorPageSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({
+    items: z.array(itemSchema),
+    nextCursor: z.string().nullable(),
   });
 
-const PostCreateSchema = createInsertSchema(posts)
-  .omit({
-    state: true,
-    slug: true,
-    isPinned: true,
-    pinnedAt: true,
-    contentJson: true,
-    contentHtml: true,
-    ...commonInsertOmitFields,
-  })
-  .extend({
-    content: z.string().min(1).max(50000),
-    tags: z.array(createIdValidator('tag')).optional().default([]),
-  });
+const PostCreateSchema = z.object({
+  title: z.string().min(3).max(100),
+  content: z.string().min(1).max(50000),
+  categoryId: createIdValidator('category'),
+  tags: z.array(createIdValidator('tag')).optional().default([]),
+});
 
-const UpdatePostSchema = createInsertSchema(posts)
-  .pick({
-    title: true,
-    categoryId: true,
-  })
-  .extend({
-    title: z.string().min(3).max(100).optional(),
-    categoryId: createIdValidator('category').optional(),
-    tags: z.array(createIdValidator('tag')).optional(),
-  });
+const UpdatePostSchema = z.object({
+  title: z.string().min(3).max(100).optional(),
+  categoryId: createIdValidator('category').optional(),
+  tags: z.array(createIdValidator('tag')).optional(),
+});
 
-// PostTags schemas
 const PostTagSelectSchema = createSelectSchema(postTags).extend({
   tag: createSelectSchema(tagsTable),
 });
@@ -65,16 +107,14 @@ export const list = createRoute({
   request: {
     query: z.object({
       limit: z.string().optional(),
-      offset: z.string().optional(),
-      from: z.string().optional(),
-      to: z.string().optional(),
+      cursor: z.string().optional(),
     }),
   },
   middleware: [authMiddleware],
   responses: {
     [HttpStatusCodes.OK]: jsonContent(
-      z.array(PostSelectSchema),
-      'The list of posts'
+      CursorPageSchema(FeedPostSchema),
+      'A paginated list of posts'
     ),
     ...openApiErrorResponses,
   },
@@ -91,13 +131,32 @@ export const create = createRoute({
   tags,
   responses: {
     [HttpStatusCodes.CREATED]: jsonContent(
-      PostSelectSchema,
-      'The created Item'
+      FeedPostSchema,
+      'The created post'
     ),
     [HttpStatusCodes.UNPROCESSABLE_ENTITY]: jsonContent(
       notFoundSchema,
       'The validation error(s)'
     ),
+    ...openApiErrorResponses,
+  },
+});
+
+export const getById = createRoute({
+  path: '/:id',
+  method: 'get',
+  summary: 'Get thread details',
+  tags,
+  request: {
+    params: IdParamsSchema,
+  },
+  middleware: [authMiddleware],
+  responses: {
+    [HttpStatusCodes.OK]: jsonContent(
+      ThreadPostSchema,
+      'The requested thread'
+    ),
+    ...openApiErrorResponses,
   },
 });
 
@@ -105,22 +164,20 @@ export const listComments = createRoute({
   path: '/:id/comments',
   method: 'get',
   tags,
-  summary: 'List post comments',
-  description: 'Get a list of post comments',
+  summary: 'List thread replies',
+  description: 'Get a cursor-paginated list of replies for a thread',
   middleware: [authMiddleware],
-
   request: {
     params: IdParamsSchema,
     query: z.object({
-      limit: z.number().min(1).max(100).default(20),
-      offset: z.number().min(0).default(0),
-      name: z.string().optional(),
+      limit: z.string().optional(),
+      cursor: z.string().optional(),
     }),
   },
   responses: {
     [HttpStatusCodes.OK]: jsonContent(
-      z.array(commentsSelectSchema),
-      'The list of comments'
+      CursorPageSchema(ThreadReplySchema),
+      'The list of thread replies'
     ),
     ...openApiErrorResponses,
   },
@@ -133,15 +190,17 @@ export const updateById = createRoute({
   summary: 'Update a post',
   description: 'Update a post',
   middleware: [authMiddleware],
-
   request: {
     params: IdParamsSchema,
     body: jsonContentRequired(UpdatePostSchema, 'The updated post'),
   },
   responses: {
-    [HttpStatusCodes.OK]: jsonContent(PostSelectSchema, 'The updated post'),
+    [HttpStatusCodes.OK]: jsonContent(
+      createSelectSchema(posts),
+      'The updated post'
+    ),
     [HttpStatusCodes.UNPROCESSABLE_ENTITY]: jsonContent(
-      createErrorSchema(PostSelectSchema),
+      createErrorSchema(createSelectSchema(posts)),
       'The validation error(s)'
     ),
     ...openApiErrorResponses,
@@ -170,7 +229,6 @@ export const deleteById = createRoute({
   },
 });
 
-// PostTags routes
 export const listPostTags = createRoute({
   path: '/:id/tags',
   method: 'get',
@@ -241,6 +299,7 @@ export const removePostTag = createRoute({
 
 export type ListRoute = typeof list;
 export type CreateRoute = typeof create;
+export type GetRoute = typeof getById;
 export type ListCommentsRoute = typeof listComments;
 export type UpdateByIdRoute = typeof updateById;
 export type DeleteByIdRoute = typeof deleteById;

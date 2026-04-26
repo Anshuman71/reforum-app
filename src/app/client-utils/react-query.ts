@@ -7,10 +7,21 @@ export const client = hc<AppType>(
   `${String(process.env.NEXT_PUBLIC_BETTER_AUTH_URL)}/api`
 );
 
-export async function getPosts(forwardedHeaders?: Record<string, string>) {
+type RequestHeaders = Record<string, string>;
+
+export async function getPosts(input?: {
+  cursor?: string;
+  limit?: number;
+  headers?: RequestHeaders;
+}) {
   const res = await client.posts.$get(
-    { query: {} },
-    { headers: { ...forwardedHeaders } }
+    {
+      query: {
+        ...(input?.cursor ? { cursor: input.cursor } : {}),
+        ...(input?.limit ? { limit: String(input.limit) } : {}),
+      },
+    },
+    { headers: { ...(input?.headers ?? {}) } }
   );
 
   type GetPosts = typeof client.posts.$get;
@@ -24,15 +35,57 @@ export async function getPosts(forwardedHeaders?: Record<string, string>) {
   return data as PostsResponse;
 }
 
-export async function getPostComments(id: string) {
-  const res = await client.posts[':id'].comments.$get({
-    param: { id },
-    query: {},
-  });
-  return await res.json();
+export async function getThread(postId: string, headers?: RequestHeaders) {
+  const res = await client.posts[':id'].$get(
+    { param: { id: postId } },
+    { headers: { ...(headers ?? {}) } }
+  );
+
+  type GetThread = typeof client.posts[':id']['$get'];
+  type ThreadResponse = InferSuccessResponse<GetThread>;
+
+  const data = await res.json();
+  if (!res.ok) {
+    const erroredData = data as InferErrorResponse<GetThread>;
+    throw new Error(erroredData.error.message);
+  }
+
+  return data as ThreadResponse;
+}
+
+export async function getThreadComments(
+  postId: string,
+  input?: {
+    cursor?: string;
+    limit?: number;
+    headers?: RequestHeaders;
+  }
+) {
+  const res = await client.posts[':id'].comments.$get(
+    {
+      param: { id: postId },
+      query: {
+        ...(input?.cursor ? { cursor: input.cursor } : {}),
+        ...(input?.limit ? { limit: String(input.limit) } : {}),
+      },
+    },
+    { headers: { ...(input?.headers ?? {}) } }
+  );
+
+  type GetThreadComments = typeof client.posts[':id']['comments']['$get'];
+  type ThreadCommentsResponse = InferSuccessResponse<GetThreadComments>;
+
+  const data = await res.json();
+  if (!res.ok) {
+    const erroredData = data as InferErrorResponse<GetThreadComments>;
+    throw new Error(erroredData.error.message);
+  }
+
+  return data as ThreadCommentsResponse;
 }
 
 export const QUERY_KEYS = {
   posts: 'posts',
-  postComments: 'post-comments',
+  thread: 'thread',
+  threadComments: 'thread-comments',
 } as const;
