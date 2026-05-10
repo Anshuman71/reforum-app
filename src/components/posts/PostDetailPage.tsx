@@ -174,33 +174,6 @@ export function PostDetailsClient() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <PostRichTextEditor
-              value={comment.json}
-              onChange={setComment}
-              ariaLabel="Reply editor"
-              helperText="Write a reply and add inline images."
-            />
-            <div className="flex justify-end">
-              {session?.user ? (
-                <Button
-                  type="submit"
-                  disabled={
-                    createCommentMutation.isPending ||
-                    (!comment.text.trim() && !comment.html.includes('<img'))
-                  }
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
-                </Button>
-              ) : (
-                <Button asChild>
-                  <Link href="/sign-in">Login to reply</Link>
-                </Button>
-              )}
-            </div>
-          </form>
-
           {replies.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No replies yet. Start the conversation.
@@ -243,6 +216,33 @@ export function PostDetailsClient() {
               </Button>
             </div>
           ) : null}
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <PostRichTextEditor
+              value={comment.json}
+              onChange={setComment}
+              ariaLabel="Reply editor"
+              helperText="Write a reply and add inline images."
+            />
+            <div className="flex justify-end">
+              {session?.user ? (
+                <Button
+                  type="submit"
+                  disabled={
+                    createCommentMutation.isPending ||
+                    (!comment.text.trim() && !comment.html.includes('<img'))
+                  }
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href="/sign-in">Login to reply</Link>
+                </Button>
+              )}
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>
