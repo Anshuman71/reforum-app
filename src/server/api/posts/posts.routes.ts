@@ -59,6 +59,8 @@ const ThreadPostSchema = z.object({
   updatedAt: z.union([z.string(), z.date()]),
   author: PublicUserSchema,
   category: CategorySummarySchema,
+  contentJson: z.unknown().nullable(),
+  contentHtml: z.string().nullable(),
   body: ThreadBodySchema.nullable(),
   repliesCount: z.number().int().nonnegative(),
 });
@@ -66,6 +68,8 @@ const ThreadPostSchema = z.object({
 const ThreadReplySchema = z.object({
   id: createIdValidator('comment'),
   content: z.string(),
+  contentJson: z.unknown().nullable(),
+  contentHtml: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]),
   updatedAt: z.union([z.string(), z.date()]),
   replyToCommentId: createIdValidator('comment').nullable(),
@@ -80,9 +84,22 @@ const CursorPageSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
 
 const PostCreateSchema = z.object({
   title: z.string().min(3).max(100),
-  content: z.string().min(1).max(50000),
+  content: z.string().max(50000),
+  contentJson: z.unknown().optional().nullable(),
+  contentHtml: z.string().max(200000).optional().nullable(),
   categoryId: createIdValidator('category'),
   tags: z.array(createIdValidator('tag')).optional().default([]),
+}).superRefine((value, ctx) => {
+  const hasTextContent = value.content.trim().length > 0;
+  const hasRichContent = Boolean(value.contentJson) || Boolean(value.contentHtml);
+
+  if (!hasTextContent && !hasRichContent) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Post content is required',
+      path: ['content'],
+    });
+  }
 });
 
 const UpdatePostSchema = z.object({

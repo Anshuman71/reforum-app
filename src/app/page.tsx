@@ -1,25 +1,37 @@
 import { PostsPageClient } from '@/components/posts/PostsClient';
 import { CreatePostModal } from '@/components/posts/CreatePostModal';
+import { PostsList } from '@/components/posts/PostsList';
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { getPosts, QUERY_KEYS } from '@/app/client-utils/react-query';
 import { getQueryClient } from '@/app/client-utils/get-query-client';
 import { headers } from 'next/headers';
+import { Suspense } from 'react';
 
-export default async function PostsPage() {
+async function PrefetchedPosts() {
   const fwHeaders = await headers();
   const queryClient = getQueryClient();
 
-  void queryClient.prefetchQuery({
-    queryKey: [QUERY_KEYS.posts],
-    queryFn: () =>
-      getPosts({
-        headers: { cookie: fwHeaders.get('cookie') ?? '' },
-      }),
-  });
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: [QUERY_KEYS.posts],
+      queryFn: () =>
+        getPosts({
+          headers: { cookie: fwHeaders.get('cookie') ?? '' },
+        }),
+    }),
+  ]);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
+      <PostsPageClient />
+    </HydrationBoundary>
+  );
+}
+
+export default function PostsPage() {
+  return (
+    <>
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -31,7 +43,9 @@ export default async function PostsPage() {
           <CreatePostModal />
         </div>
       </div>
-      <PostsPageClient />
-    </HydrationBoundary>
+      <Suspense fallback={<PostsList posts={[]} loading />}>
+        <PrefetchedPosts />
+      </Suspense>
+    </>
   );
 }

@@ -121,6 +121,56 @@ export class ReforumApiError extends HTTPException {
   }
 }
 
+function getErrorCause(error: Error): Record<string, unknown> | undefined {
+  if (!error.cause || typeof error.cause !== 'object') {
+    return undefined;
+  }
+
+  const cause = error.cause as {
+    name?: unknown;
+    message?: unknown;
+    code?: unknown;
+    detail?: unknown;
+    table?: unknown;
+    column?: unknown;
+    constraint?: unknown;
+    schema?: unknown;
+  };
+
+  return {
+    name: cause.name,
+    message: cause.message,
+    code: cause.code,
+    detail: cause.detail,
+    table: cause.table,
+    column: cause.column,
+    constraint: cause.constraint,
+    schema: cause.schema,
+  };
+}
+
+function logServerError(
+  label: string,
+  err: Error,
+  c: Context<{ Variables: AuthedVariables }>,
+  details: Record<string, unknown> = {}
+) {
+  const user = c.get('user');
+
+  console.error(label, {
+    ...details,
+    requestId: c.get('requestId'),
+    method: c.req.method,
+    path: c.req.path,
+    userId: user?.id ?? null,
+    userRole: user?.role ?? null,
+    name: err.name,
+    message: err.message,
+    cause: getErrorCause(err),
+    stack: err.stack,
+  });
+}
+
 export function handleZodError(
   result:
     | {
@@ -157,6 +207,10 @@ export function handleError(
    */
   if (err instanceof ReforumApiError) {
     if (err.status >= 500) {
+      logServerError('api error', err, c, {
+        code: err.code,
+        status: err.status,
+      });
     }
     return c.json<z.infer<typeof ErrorSchema>>(
       {
@@ -177,10 +231,9 @@ export function handleError(
    */
   if (err instanceof HTTPException) {
     if (err.status >= 500) {
-      console.error('HTTPException', {
-        message: err.message,
+      logServerError('http exception', err, c, {
+        code: statusToCode(err.status),
         status: err.status,
-        requestId: c.get('requestId'),
       });
     }
     const code = statusToCode(err.status);
@@ -200,12 +253,9 @@ export function handleError(
   /**
    * We're lost here, all we can do is return a 500 and log it to investigate
    */
-  console.error('unhandled exception', {
-    name: err.name,
-    message: err.message,
-    cause: err.cause,
-    stack: err.stack,
-    requestId: c.get('requestId'),
+  logServerError('unhandled exception', err, c, {
+    code: 'INTERNAL_SERVER_ERROR',
+    status: 500,
   });
   return c.json<z.infer<typeof ErrorSchema>>(
     {

@@ -6,6 +6,7 @@ import configureOpenAPI from '@/server/common/configure-open-api';
 import createApp from '@/server/common/create-app';
 import { postsRouter } from '@/server/api/posts/posts.index';
 import { tagsRouter } from '@/server/api/tags/tags.index';
+import { uploadsRouter } from '@/server/api/uploads/uploads.index';
 import { handle } from 'hono/vercel';
 
 const app = createApp();
@@ -16,6 +17,7 @@ const routes = [
   commentsRouter,
   categoriesRouter,
   tagsRouter,
+  uploadsRouter,
 ] as const;
 
 app.get('/ping', c => c.text('Pong!'));

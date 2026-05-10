@@ -9,6 +9,40 @@ export const client = hc<AppType>(
 
 type RequestHeaders = Record<string, string>;
 
+async function parseResponse(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function getErrorMessage(data: unknown, fallback: string) {
+  if (
+    data &&
+    typeof data === 'object' &&
+    'error' in data &&
+    data.error &&
+    typeof data.error === 'object' &&
+    'message' in data.error &&
+    typeof data.error.message === 'string'
+  ) {
+    return data.error.message;
+  }
+
+  if (typeof data === 'string' && data.trim().length > 0) {
+    return data;
+  }
+
+  return fallback;
+}
+
 export async function getPosts(input?: {
   cursor?: string;
   limit?: number;
@@ -27,10 +61,9 @@ export async function getPosts(input?: {
   type GetPosts = typeof client.posts.$get;
   type PostsResponse = InferSuccessResponse<GetPosts>;
 
-  const data = await res.json();
+  const data = await parseResponse(res);
   if (!res.ok) {
-    const erroredData = data as InferErrorResponse<GetPosts>;
-    throw new Error(erroredData.error.message);
+    throw new Error(getErrorMessage(data, 'Failed to load posts'));
   }
   return data as PostsResponse;
 }
@@ -44,10 +77,9 @@ export async function getThread(postId: string, headers?: RequestHeaders) {
   type GetThread = typeof client.posts[':id']['$get'];
   type ThreadResponse = InferSuccessResponse<GetThread>;
 
-  const data = await res.json();
+  const data = await parseResponse(res);
   if (!res.ok) {
-    const erroredData = data as InferErrorResponse<GetThread>;
-    throw new Error(erroredData.error.message);
+    throw new Error(getErrorMessage(data, 'Failed to load thread'));
   }
 
   return data as ThreadResponse;
@@ -75,10 +107,9 @@ export async function getThreadComments(
   type GetThreadComments = typeof client.posts[':id']['comments']['$get'];
   type ThreadCommentsResponse = InferSuccessResponse<GetThreadComments>;
 
-  const data = await res.json();
+  const data = await parseResponse(res);
   if (!res.ok) {
-    const erroredData = data as InferErrorResponse<GetThreadComments>;
-    throw new Error(erroredData.error.message);
+    throw new Error(getErrorMessage(data, 'Failed to load thread comments'));
   }
 
   return data as ThreadCommentsResponse;

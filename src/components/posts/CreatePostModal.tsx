@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -24,6 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  PostRichTextEditor,
+  type PostEditorValue,
+} from '@/components/posts/PostRichTextEditor';
 
 interface CreatePostModalProps {
   onPostCreated?: () => void;
@@ -44,8 +47,15 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState({
     title: '',
-    content: '',
     categoryId: '',
+  });
+  const [editorValue, setEditorValue] = useState<PostEditorValue>({
+    text: '',
+    html: '<p></p>',
+    json: {
+      type: 'doc',
+      content: [{ type: 'paragraph' }],
+    },
   });
 
   useEffect(() => {
@@ -79,7 +89,7 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
 
     if (
       !formData.title.trim() ||
-      !formData.content.trim() ||
+      (!editorValue.text.trim() && !editorValue.html.includes('<img')) ||
       !formData.categoryId
     ) {
       alert('Please fill in all required fields');
@@ -92,7 +102,9 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
       const res = await client.posts.$post({
         json: {
           title: formData.title.trim(),
-          content: formData.content.trim(),
+          content: editorValue.text.trim(),
+          contentHtml: editorValue.html,
+          contentJson: editorValue.json,
           categoryId: formData.categoryId,
           tags: [],
         },
@@ -103,7 +115,15 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
         throw new Error(errorData?.error?.message ?? 'Failed to create post');
       }
 
-      setFormData({ title: '', content: '', categoryId: '' });
+      setFormData({ title: '', categoryId: '' });
+      setEditorValue({
+        text: '',
+        html: '<p></p>',
+        json: {
+          type: 'doc',
+          content: [{ type: 'paragraph' }],
+        },
+      });
       setOpen(false);
 
       await queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.posts] });
@@ -121,7 +141,9 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
   };
 
   const isFormValid =
-    formData.title.trim() && formData.content.trim() && formData.categoryId;
+    formData.title.trim() &&
+    (editorValue.text.trim() || editorValue.html.includes('<img')) &&
+    formData.categoryId;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -185,17 +207,12 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
             <Label htmlFor="content">
               Content <span className="text-destructive">*</span>
             </Label>
-            <Textarea
-              id="content"
-              placeholder="What would you like to share with the community?"
-              value={formData.content}
-              onChange={e => handleInputChange('content', e.target.value)}
-              rows={6}
-              maxLength={5000}
-              required
+            <PostRichTextEditor
+              value={editorValue.json}
+              onChange={setEditorValue}
             />
             <p className="text-xs text-muted-foreground">
-              {formData.content.length}/5000 characters
+              {editorValue.text.length}/5000 characters
             </p>
           </div>
 

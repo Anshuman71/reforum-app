@@ -2,7 +2,9 @@
 
 import { Search } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession, signOut } from '@/lib/auth-client';
+import { client } from '@/app/client-utils/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,11 +14,86 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+
+async function uploadAvatarFile(file: File) {
+  const prepareResponse = await client.uploads.avatar.prepare.$post({
+    json: {
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+    },
+  });
+
+  const preparePayload = await prepareResponse.json();
+
+  if (!prepareResponse.ok) {
+    throw new Error(
+      (preparePayload as any)?.error?.message ?? 'Failed to prepare avatar upload'
+    );
+  }
+
+  const target = preparePayload as {
+    strategy: 'presigned' | 'server';
+    uploadUrl: string;
+    method: 'PUT' | 'POST';
+    headers?: Record<string, string>;
+    storagePath: string;
+  };
+
+  if (target.strategy === 'presigned') {
+    const uploadResponse = await fetch(target.uploadUrl, {
+      method: target.method,
+      body: file,
+      headers: target.headers,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload avatar to storage');
+    }
+  } else {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const uploadResponse = await fetch(target.uploadUrl, {
+      method: target.method,
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const payload = await uploadResponse.json().catch(() => null);
+      throw new Error(
+        payload?.error?.message ?? 'Failed to upload avatar to local storage'
+      );
+    }
+  }
+
+  const completeResponse = await client.uploads.avatar.complete.$post({
+    json: {
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      storagePath: target.storagePath,
+    },
+  });
+
+  const completePayload = await completeResponse.json();
+
+  if (!completeResponse.ok) {
+    throw new Error(
+      (completePayload as any)?.error?.message ?? 'Failed to finalize avatar upload'
+    );
+  }
+}
 
 export function Navbar() {
   const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +105,40 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleAvatarSelection = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_SIZE) {
+      alert('Avatar size must be 5MB or less.');
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      await uploadAvatarFile(file);
+      router.refresh();
+      window.location.reload();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Failed to upload avatar. Please try again.'
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const getUserInitials = (name?: string) => {
@@ -56,6 +167,13 @@ export function Navbar() {
 
           {/* Right side - Search bar and User actions */}
           <div className="flex items-center space-x-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarSelection}
+            />
             {/* Search Bar */}
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -101,6 +219,12 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/settings">Settings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                  >
+                    {isUploadingAvatar ? 'Uploading avatar...' : 'Update avatar'}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSignOut}>
                     Sign out

@@ -1,8 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { notFound, onError, serveEmojiFavicon } from 'stoker/middlewares';
+import { notFound, serveEmojiFavicon } from 'stoker/middlewares';
 import { defaultHook } from 'stoker/openapi';
 import { requestId } from 'hono/request-id';
 import { authMiddleware } from './middlewares';
+import { handleError } from '@/server/errors';
 import { AuthedVariables } from '@/types';
 
 export function createRouter() {
@@ -17,6 +18,6 @@ export default function createApp() {
   app.use(requestId()).use(serveEmojiFavicon('📝'));
   app.use(authMiddleware);
   app.notFound(notFound);
-  app.onError(onError);
+  app.onError(handleError);
   return app;
 }

@@ -1,9 +1,10 @@
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { auth } from '@/server/lib/auth';
-import { db } from '@/server/db';
-import { users } from '@/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/server/lib/auth";
+import { db } from "@/server/db";
+import { users } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
+import { Suspense } from "react";
 
 export default async function AdminLayout({
   children,
@@ -15,7 +16,7 @@ export default async function AdminLayout({
   });
 
   if (!session) {
-    redirect('/sign-in');
+    redirect("/sign-in");
   }
 
   const [dbUser] = await db
@@ -24,9 +25,9 @@ export default async function AdminLayout({
     .where(eq(users.id, session.user.id))
     .limit(1);
 
-  if (dbUser?.role !== 'admin') {
-    redirect('/');
+  if (dbUser?.role !== "admin") {
+    redirect("/");
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>;
 }

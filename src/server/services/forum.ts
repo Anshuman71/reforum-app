@@ -64,6 +64,8 @@ export type ThreadBody = {
 export type ThreadReply = {
   id: string;
   content: string;
+  contentJson: unknown | null;
+  contentHtml: string | null;
   createdAt: Date;
   updatedAt: Date;
   replyToCommentId: string | null;
@@ -79,9 +81,59 @@ export type ThreadPost = {
   updatedAt: Date;
   author: FeedAuthor;
   category: FeedCategory;
+  contentJson: unknown | null;
+  contentHtml: string | null;
   body: ThreadBody | null;
   repliesCount: number;
 };
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function resolvePlainTextPostContent(input: {
+  content: string;
+  contentHtml?: string | null;
+}): string {
+  const plainText = input.content.trim();
+
+  if (plainText.length > 0) {
+    return plainText;
+  }
+
+  const htmlText = input.contentHtml ? stripHtml(input.contentHtml) : '';
+  if (htmlText.length > 0) {
+    return htmlText;
+  }
+
+  if (input.contentHtml?.includes('<img')) {
+    return '[Image post]';
+  }
+
+  return '';
+}
+
+function resolvePlainTextCommentContent(input: {
+  content: string;
+  contentHtml?: string | null;
+}): string {
+  const plainText = input.content.trim();
+
+  if (plainText.length > 0) {
+    return plainText;
+  }
+
+  const htmlText = input.contentHtml ? stripHtml(input.contentHtml) : '';
+  if (htmlText.length > 0) {
+    return htmlText;
+  }
+
+  if (input.contentHtml?.includes('<img')) {
+    return '[Image comment]';
+  }
+
+  return '';
+}
 
 function unauthorized(message = 'Authentication required'): never {
   throw new ReforumApiError({
@@ -295,15 +347,30 @@ export async function createPost(input: {
   actor: NullableActor;
   title: string;
   content: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
   categoryId: string;
   tags?: string[];
 }): Promise<FeedPost> {
   const actor = requireActor(input.actor);
+  const plainTextContent = resolvePlainTextPostContent({
+    content: input.content,
+    contentHtml: input.contentHtml,
+  });
+
+  if (!plainTextContent && !input.contentJson && !input.contentHtml) {
+    throw new ReforumApiError({
+      code: 'BAD_REQUEST',
+      message: 'Post content is required',
+    });
+  }
 
   const ctx = await emitBeforeEvent('post:beforeCreate', {
     data: {
       title: input.title,
-      content: input.content,
+      content: plainTextContent,
+      contentJson: input.contentJson ?? null,
+      contentHtml: input.contentHtml ?? null,
       authorId: actor.id,
       categoryId: input.categoryId,
       tags: input.tags ?? [],
@@ -330,6 +397,8 @@ export async function createPost(input: {
       slug: slugify(ctx.data.title, { lower: true, strict: true }),
       authorId: actor.id,
       categoryId: ctx.data.categoryId,
+      contentJson: ctx.data.contentJson,
+      contentHtml: ctx.data.contentHtml,
     });
 
     await tx.insert(comments).values({
@@ -359,8 +428,8 @@ export async function createPost(input: {
       state: created.state as any,
       title: created.title,
       slug: created.slug,
-      contentJson: null,
-      contentHtml: null,
+      contentJson: created.contentJson,
+      contentHtml: created.contentHtml,
       isPinned: false,
       pinnedAt: null,
       createdAt: created.createdAt,
@@ -426,6 +495,8 @@ export async function getThread(postId: string, actor: NullableActor): Promise<T
       name: post.category.name,
       isPrivate: post.category.isPrivate,
     },
+    contentJson: post.contentJson,
+    contentHtml: post.contentHtml,
     body: body
       ? {
           id: body.id,
@@ -472,6 +543,8 @@ export async function listThreadComments(input: {
   const items: ThreadReply[] = pageRows.map(comment => ({
     id: comment.id,
     content: comment.content,
+    contentJson: comment.contentJson,
+    contentHtml: comment.contentHtml,
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
     replyToCommentId: comment.replyToCommentId,
@@ -493,9 +566,22 @@ export async function createComment(input: {
   actor: NullableActor;
   postId: string;
   content: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
   replyToCommentId?: string | null;
 }) {
   const actor = requireActor(input.actor);
+  const plainTextContent = resolvePlainTextCommentContent({
+    content: input.content,
+    contentHtml: input.contentHtml,
+  });
+
+  if (!plainTextContent && !input.contentJson && !input.contentHtml) {
+    throw new ReforumApiError({
+      code: 'BAD_REQUEST',
+      message: 'Comment content is required',
+    });
+  }
 
   const post = await db.query.posts.findFirst({
     where: and(eq(posts.id, input.postId), eq(posts.state, 'active')),
@@ -509,7 +595,9 @@ export async function createComment(input: {
     data: {
       postId: input.postId,
       authorId: actor.id,
-      content: input.content,
+      content: plainTextContent,
+      contentJson: input.contentJson ?? null,
+      contentHtml: input.contentHtml ?? null,
       replyToCommentId: input.replyToCommentId ?? undefined,
     },
     actor,
@@ -523,6 +611,8 @@ export async function createComment(input: {
       postId: ctx.data.postId,
       authorId: actor.id,
       content: ctx.data.content,
+      contentJson: ctx.data.contentJson ?? null,
+      contentHtml: ctx.data.contentHtml ?? null,
       replyToCommentId: ctx.data.replyToCommentId ?? null,
     })
     .returning();
@@ -545,6 +635,8 @@ export async function createComment(input: {
   return {
     id: created!.id,
     content: created!.content,
+    contentJson: created!.contentJson,
+    contentHtml: created!.contentHtml,
     createdAt: created!.createdAt,
     updatedAt: created!.updatedAt,
     replyToCommentId: created!.replyToCommentId,
@@ -656,6 +748,8 @@ export async function updateComment(input: {
   id: string;
   actor: NullableActor;
   content?: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
 }) {
   const actor = requireActor(input.actor);
 
@@ -671,7 +765,11 @@ export async function updateComment(input: {
 
   const ctx = await emitBeforeEvent('comment:beforeUpdate', {
     entity: existing,
-    data: { content: input.content },
+    data: {
+      content: input.content,
+      contentJson: input.contentJson,
+      contentHtml: input.contentHtml,
+    },
     actor,
     meta: {},
   });

@@ -22,6 +22,8 @@ const CommentAuthorSchema = z.object({
 const commentReplySchema = z.object({
   id: IdParamsSchema.shape.id,
   content: z.string(),
+  contentJson: z.unknown().nullable(),
+  contentHtml: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]),
   updatedAt: z.union([z.string(), z.date()]),
   replyToCommentId: IdParamsSchema.shape.id.nullable(),
@@ -30,13 +32,41 @@ const commentReplySchema = z.object({
 
 const commentsCreateSchema = z.object({
   postId: PostIdSchema,
-  content: z.string().min(1).max(50000),
+  content: z.string().max(50000),
+  contentJson: z.unknown().optional().nullable(),
+  contentHtml: z.string().max(200000).optional().nullable(),
   replyToCommentId: getIdParamsSchema('comment').shape.id.optional().nullable(),
+}).superRefine((value, ctx) => {
+  const hasTextContent = value.content.trim().length > 0;
+  const hasRichContent = Boolean(value.contentJson) || Boolean(value.contentHtml);
+
+  if (!hasTextContent && !hasRichContent) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Comment content is required',
+      path: ['content'],
+    });
+  }
 });
 
 const commentsUpdateSchema = createInsertSchema(comments).pick({
   content: true,
+  contentJson: true,
+  contentHtml: true,
   replyToCommentId: true,
+}).superRefine((value, ctx) => {
+  const hasTextContent = typeof value.content === 'string' && value.content.trim().length > 0;
+  const hasRichContent = Boolean(value.contentJson) || Boolean(value.contentHtml);
+
+  if ('content' in value || 'contentJson' in value || 'contentHtml' in value) {
+    if (!hasTextContent && !hasRichContent) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Comment content is required',
+        path: ['content'],
+      });
+    }
+  }
 });
 
 const API_TAG = ['Comments'];

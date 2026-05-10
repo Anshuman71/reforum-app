@@ -55,6 +55,8 @@ type FlagSelect = typeof flags.$inferSelect;
 type PostCreateData = {
   title: string;
   content: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
   authorId: string;
   categoryId: string;
   tags: string[];
@@ -70,11 +72,15 @@ type CommentCreateData = {
   postId: string;
   authorId: string;
   content: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
   replyToCommentId?: string;
 };
 
 type CommentUpdateData = {
   content?: string;
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
 };
 
 type CategoryCreateData = {

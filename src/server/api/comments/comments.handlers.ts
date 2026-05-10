@@ -23,6 +23,8 @@ export const create: AppRouteHandler<CreateRoute> = async c => {
     actor,
     postId: data.postId,
     content: data.content,
+    contentJson: data.contentJson,
+    contentHtml: data.contentHtml,
     replyToCommentId: data.replyToCommentId,
   });
 
@@ -49,6 +51,8 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
     id,
     actor,
     content: data.content,
+    contentJson: data.contentJson,
+    contentHtml: data.contentHtml,
   });
 
   return c.json(comment, HttpStatusCodes.OK);

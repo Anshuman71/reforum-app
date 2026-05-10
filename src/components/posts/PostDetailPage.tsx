@@ -9,8 +9,21 @@ import { client, getThread, getThreadComments, QUERY_KEYS } from '@/app/client-u
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useSession } from '@/lib/auth-client';
+import { PostRichTextContent } from '@/components/posts/PostRichTextContent';
+import {
+  PostRichTextEditor,
+  type PostEditorValue,
+} from '@/components/posts/PostRichTextEditor';
+
+const EMPTY_EDITOR_VALUE: PostEditorValue = {
+  text: '',
+  html: '<p></p>',
+  json: {
+    type: 'doc',
+    content: [{ type: 'paragraph' }],
+  },
+};
 
 function AuthorAvatar(props: {
   id: string;
@@ -32,7 +45,7 @@ export function PostDetailsClient() {
   const postId = params.id;
   const queryClient = useQueryClient();
   const { data: session } = useSession();
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState<PostEditorValue>(EMPTY_EDITOR_VALUE);
 
   const threadQuery = useQuery({
     queryKey: [QUERY_KEYS.thread, postId],
@@ -52,11 +65,13 @@ export function PostDetailsClient() {
   });
 
   const createCommentMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (content: PostEditorValue) => {
       const res = await client.comments.$post({
         json: {
           postId,
-          content,
+          content: content.text.trim(),
+          contentHtml: content.html,
+          contentJson: content.json,
           replyToCommentId: null,
         },
       });
@@ -69,7 +84,7 @@ export function PostDetailsClient() {
       return payload;
     },
     onSuccess: async () => {
-      setComment('');
+      setComment(EMPTY_EDITOR_VALUE);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.thread, postId] }),
         queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.threadComments, postId] }),
@@ -79,8 +94,8 @@ export function PostDetailsClient() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!comment.trim()) return;
-    await createCommentMutation.mutateAsync(comment.trim());
+    if (!comment.text.trim() && !comment.html.includes('<img')) return;
+    await createCommentMutation.mutateAsync(comment);
   };
 
   if (threadQuery.isLoading || commentsQuery.isLoading) {
@@ -136,9 +151,13 @@ export function PostDetailsClient() {
                   </p>
                 </div>
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-6">
-                {thread.body.content}
-              </p>
+              {thread.contentJson ? (
+                <PostRichTextContent contentJson={thread.contentJson} />
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  {thread.body.content}
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">This thread has no body yet.</p>
@@ -158,16 +177,19 @@ export function PostDetailsClient() {
         <CardContent className="space-y-4">
           {session?.user ? (
             <form onSubmit={handleSubmit} className="space-y-3">
-              <Textarea
-                value={comment}
-                onChange={event => setComment(event.target.value)}
-                placeholder="Write a reply..."
-                rows={4}
+              <PostRichTextEditor
+                value={comment.json}
+                onChange={setComment}
+                ariaLabel="Reply editor"
+                helperText="Write a reply and add inline images."
               />
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  disabled={createCommentMutation.isPending || !comment.trim()}
+                  disabled={
+                    createCommentMutation.isPending ||
+                    (!comment.text.trim() && !comment.html.includes('<img'))
+                  }
                 >
                   <Send className="mr-2 h-4 w-4" />
                   {createCommentMutation.isPending ? 'Posting...' : 'Post Reply'}
@@ -201,9 +223,13 @@ export function PostDetailsClient() {
                       </p>
                     </div>
                   </div>
-                  <p className="whitespace-pre-wrap text-sm leading-6">
-                    {reply.content}
-                  </p>
+                  {reply.contentJson ? (
+                    <PostRichTextContent contentJson={reply.contentJson} />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-6">
+                      {reply.content}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
