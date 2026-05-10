@@ -22,7 +22,6 @@ export const create: AppRouteHandler<CreateRoute> = async c => {
   const comment = await createComment({
     actor,
     postId: data.postId,
-    content: data.content,
     contentJson: data.contentJson,
     contentHtml: data.contentHtml,
     replyToCommentId: data.replyToCommentId,
@@ -50,7 +49,6 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
   const comment = await updateComment({
     id,
     actor,
-    content: data.content,
     contentJson: data.contentJson,
     contentHtml: data.contentHtml,
   });

@@ -22,6 +22,13 @@
       "when": 1778412678607,
       "tag": "0002_polite_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778413473134,
+      "tag": "0003_charming_mister_fear",
+      "breakpoints": true
     }
   ]
 }

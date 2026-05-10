@@ -242,7 +242,6 @@ export const comments = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     state: commentStates().notNull().default("active"),
     replyToCommentId: text("reply_to_comment_id"),
-    content: text("content").notNull(),
     contentJson: jsonb("content_json"),
     contentHtml: text("content_html"),
     createdAt: timestamp("created_at", { withTimezone: true })

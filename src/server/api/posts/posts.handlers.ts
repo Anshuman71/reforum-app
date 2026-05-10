@@ -48,7 +48,6 @@ export const create: AppRouteHandler<CreateRoute> = async c => {
   const post = await createPost({
     actor,
     title: data.title,
-    content: data.content,
     contentJson: data.contentJson,
     contentHtml: data.contentHtml,
     categoryId: data.categoryId,

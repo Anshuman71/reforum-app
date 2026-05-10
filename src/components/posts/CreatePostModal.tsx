@@ -102,7 +102,6 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
       const res = await client.posts.$post({
         json: {
           title: formData.title.trim(),
-          content: editorValue.text.trim(),
           contentHtml: editorValue.html,
           contentJson: editorValue.json,
           categoryId: formData.categoryId,

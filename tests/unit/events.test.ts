@@ -20,6 +20,15 @@ beforeEach(() => {
   clearHooks();
 });
 
+const postData = (title: string, body = 'Body') => ({
+  title,
+  contentJson: { type: 'doc' },
+  contentHtml: `<p>${body}</p>`,
+  authorId: 'u1',
+  categoryId: 'c1',
+  tags: [],
+});
+
 // --------------------------------------------------------
 // Before hooks
 // --------------------------------------------------------
@@ -27,7 +36,7 @@ beforeEach(() => {
 describe('emitBeforeEvent', () => {
   it('returns original context when no hooks registered', async () => {
     const ctx = {
-      data: { title: 'Hello', content: 'World', authorId: 'u1', categoryId: 'c1', tags: [] },
+      data: postData('Hello', 'World'),
       actor: { id: 'u1', role: 'user' },
       meta: {},
     };
@@ -43,7 +52,7 @@ describe('emitBeforeEvent', () => {
     }));
 
     const result = await emitBeforeEvent('post:beforeCreate', {
-      data: { title: 'Original', content: 'Body', authorId: 'u1', categoryId: 'c1', tags: [] },
+      data: postData('Original'),
       actor: { id: 'u1', role: 'user' },
       meta: {},
     });
@@ -63,7 +72,7 @@ describe('emitBeforeEvent', () => {
     }));
 
     const result = await emitBeforeEvent('post:beforeCreate', {
-      data: { title: 'Start', content: 'Body', authorId: 'u1', categoryId: 'c1', tags: [] },
+      data: postData('Start'),
       actor: { id: 'u1', role: 'user' },
       meta: {},
     });
@@ -78,7 +87,7 @@ describe('emitBeforeEvent', () => {
 
     await expect(
       emitBeforeEvent('post:beforeCreate', {
-        data: { title: 'Spam', content: 'Buy now', authorId: 'u1', categoryId: 'c1', tags: [] },
+        data: postData('Spam', 'Buy now'),
         actor: { id: 'u1', role: 'user' },
         meta: {},
       })
@@ -96,7 +105,7 @@ describe('emitBeforeEvent', () => {
 
     await expect(
       emitBeforeEvent('post:beforeCreate', {
-        data: { title: 'Test', content: 'Body', authorId: 'u1', categoryId: 'c1', tags: [] },
+        data: postData('Test'),
         actor: { id: 'u1', role: 'user' },
         meta: {},
       })
@@ -117,7 +126,7 @@ describe('emitBeforeEvent', () => {
     });
 
     await emitBeforeEvent('post:beforeCreate', {
-      data: { title: 'Test', content: 'Body', authorId: 'u1', categoryId: 'c1', tags: [] },
+      data: postData('Test'),
       actor: { id: 'u1', role: 'user' },
       meta: {},
     });
@@ -245,7 +254,7 @@ describe('clearHooks', () => {
     clearHooks();
 
     const result = await emitBeforeEvent('post:beforeCreate', {
-      data: { title: 'Test', content: 'Body', authorId: 'u1', categoryId: 'c1', tags: [] },
+      data: postData('Test'),
       actor: { id: 'u1', role: 'user' },
       meta: {},
     });

@@ -44,7 +44,6 @@ const FeedPostSchema = z.object({
 
 const ThreadBodySchema = z.object({
   id: createIdValidator('comment'),
-  content: z.string(),
   createdAt: z.union([z.string(), z.date()]),
   updatedAt: z.union([z.string(), z.date()]),
   author: PublicUserSchema,
@@ -67,7 +66,6 @@ const ThreadPostSchema = z.object({
 
 const ThreadReplySchema = z.object({
   id: createIdValidator('comment'),
-  content: z.string(),
   contentJson: z.unknown().nullable(),
   contentHtml: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]),
@@ -82,22 +80,30 @@ const CursorPageSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
     nextCursor: z.string().nullable(),
   });
 
+function hasRichContent(value: {
+  contentJson?: unknown | null;
+  contentHtml?: string | null;
+}) {
+  const hasTextContent = value.contentHtml
+    ? value.contentHtml.replace(/<[^>]+>/g, ' ').trim().length > 0
+    : false;
+  const hasMediaContent = Boolean(value.contentHtml?.includes('<img'));
+
+  return Boolean(value.contentJson) || hasTextContent || hasMediaContent;
+}
+
 const PostCreateSchema = z.object({
   title: z.string().min(3).max(100),
-  content: z.string().max(50000),
   contentJson: z.unknown().optional().nullable(),
   contentHtml: z.string().max(200000).optional().nullable(),
   categoryId: createIdValidator('category'),
   tags: z.array(createIdValidator('tag')).optional().default([]),
 }).superRefine((value, ctx) => {
-  const hasTextContent = value.content.trim().length > 0;
-  const hasRichContent = Boolean(value.contentJson) || Boolean(value.contentHtml);
-
-  if (!hasTextContent && !hasRichContent) {
+  if (!hasRichContent(value)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Post content is required',
-      path: ['content'],
+      path: ['contentJson'],
     });
   }
 });

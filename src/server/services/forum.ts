@@ -55,7 +55,6 @@ export type CursorPage<T> = {
 
 export type ThreadBody = {
   id: string;
-  content: string;
   createdAt: Date;
   updatedAt: Date;
   author: FeedAuthor;
@@ -63,7 +62,6 @@ export type ThreadBody = {
 
 export type ThreadReply = {
   id: string;
-  content: string;
   contentJson: unknown | null;
   contentHtml: string | null;
   createdAt: Date;
@@ -91,48 +89,20 @@ function stripHtml(value: string): string {
   return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function resolvePlainTextPostContent(input: {
-  content: string;
+function hasRenderableContent(input: {
+  contentJson?: unknown | null;
   contentHtml?: string | null;
-}): string {
-  const plainText = input.content.trim();
-
-  if (plainText.length > 0) {
-    return plainText;
-  }
-
+}): boolean {
   const htmlText = input.contentHtml ? stripHtml(input.contentHtml) : '';
   if (htmlText.length > 0) {
-    return htmlText;
+    return true;
   }
 
   if (input.contentHtml?.includes('<img')) {
-    return '[Image post]';
+    return true;
   }
 
-  return '';
-}
-
-function resolvePlainTextCommentContent(input: {
-  content: string;
-  contentHtml?: string | null;
-}): string {
-  const plainText = input.content.trim();
-
-  if (plainText.length > 0) {
-    return plainText;
-  }
-
-  const htmlText = input.contentHtml ? stripHtml(input.contentHtml) : '';
-  if (htmlText.length > 0) {
-    return htmlText;
-  }
-
-  if (input.contentHtml?.includes('<img')) {
-    return '[Image comment]';
-  }
-
-  return '';
+  return Boolean(input.contentJson);
 }
 
 function unauthorized(message = 'Authentication required'): never {
@@ -346,19 +316,18 @@ export async function listPosts(input: {
 export async function createPost(input: {
   actor: NullableActor;
   title: string;
-  content: string;
   contentJson?: unknown | null;
   contentHtml?: string | null;
   categoryId: string;
   tags?: string[];
 }): Promise<FeedPost> {
   const actor = requireActor(input.actor);
-  const plainTextContent = resolvePlainTextPostContent({
-    content: input.content,
+  const hasContent = hasRenderableContent({
+    contentJson: input.contentJson,
     contentHtml: input.contentHtml,
   });
 
-  if (!plainTextContent && !input.contentJson && !input.contentHtml) {
+  if (!hasContent) {
     throw new ReforumApiError({
       code: 'BAD_REQUEST',
       message: 'Post content is required',
@@ -368,7 +337,6 @@ export async function createPost(input: {
   const ctx = await emitBeforeEvent('post:beforeCreate', {
     data: {
       title: input.title,
-      content: plainTextContent,
       contentJson: input.contentJson ?? null,
       contentHtml: input.contentHtml ?? null,
       authorId: actor.id,
@@ -405,7 +373,8 @@ export async function createPost(input: {
       id: newId('comment'),
       postId,
       authorId: actor.id,
-      content: ctx.data.content,
+      contentJson: ctx.data.contentJson,
+      contentHtml: ctx.data.contentHtml,
     });
 
     if (ctx.data.tags.length > 0) {
@@ -500,7 +469,6 @@ export async function getThread(postId: string, actor: NullableActor): Promise<T
     body: body
       ? {
           id: body.id,
-          content: body.content,
           createdAt: body.createdAt,
           updatedAt: body.updatedAt,
           author: toFeedAuthor(body.author),
@@ -542,7 +510,6 @@ export async function listThreadComments(input: {
 
   const items: ThreadReply[] = pageRows.map(comment => ({
     id: comment.id,
-    content: comment.content,
     contentJson: comment.contentJson,
     contentHtml: comment.contentHtml,
     createdAt: comment.createdAt,
@@ -565,18 +532,17 @@ export async function listThreadComments(input: {
 export async function createComment(input: {
   actor: NullableActor;
   postId: string;
-  content: string;
   contentJson?: unknown | null;
   contentHtml?: string | null;
   replyToCommentId?: string | null;
 }) {
   const actor = requireActor(input.actor);
-  const plainTextContent = resolvePlainTextCommentContent({
-    content: input.content,
+  const hasContent = hasRenderableContent({
+    contentJson: input.contentJson,
     contentHtml: input.contentHtml,
   });
 
-  if (!plainTextContent && !input.contentJson && !input.contentHtml) {
+  if (!hasContent) {
     throw new ReforumApiError({
       code: 'BAD_REQUEST',
       message: 'Comment content is required',
@@ -595,7 +561,6 @@ export async function createComment(input: {
     data: {
       postId: input.postId,
       authorId: actor.id,
-      content: plainTextContent,
       contentJson: input.contentJson ?? null,
       contentHtml: input.contentHtml ?? null,
       replyToCommentId: input.replyToCommentId ?? undefined,
@@ -610,7 +575,6 @@ export async function createComment(input: {
       id: newId('comment'),
       postId: ctx.data.postId,
       authorId: actor.id,
-      content: ctx.data.content,
       contentJson: ctx.data.contentJson ?? null,
       contentHtml: ctx.data.contentHtml ?? null,
       replyToCommentId: ctx.data.replyToCommentId ?? null,
@@ -634,7 +598,6 @@ export async function createComment(input: {
 
   return {
     id: created!.id,
-    content: created!.content,
     contentJson: created!.contentJson,
     contentHtml: created!.contentHtml,
     createdAt: created!.createdAt,
@@ -747,7 +710,6 @@ export async function getCommentById(id: string, actor: NullableActor) {
 export async function updateComment(input: {
   id: string;
   actor: NullableActor;
-  content?: string;
   contentJson?: unknown | null;
   contentHtml?: string | null;
 }) {
@@ -766,7 +728,6 @@ export async function updateComment(input: {
   const ctx = await emitBeforeEvent('comment:beforeUpdate', {
     entity: existing,
     data: {
-      content: input.content,
       contentJson: input.contentJson,
       contentHtml: input.contentHtml,
     },

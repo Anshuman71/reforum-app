@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { MessageCircle, Send } from 'lucide-react';
 import BoaringAvatar from 'boring-avatars';
@@ -69,7 +70,6 @@ export function PostDetailsClient() {
       const res = await client.comments.$post({
         json: {
           postId,
-          content: content.text.trim(),
           contentHtml: content.html,
           contentJson: content.json,
           replyToCommentId: null,
@@ -94,6 +94,7 @@ export function PostDetailsClient() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!session?.user) return;
     if (!comment.text.trim() && !comment.html.includes('<img')) return;
     await createCommentMutation.mutateAsync(comment);
   };
@@ -151,12 +152,10 @@ export function PostDetailsClient() {
                   </p>
                 </div>
               </div>
-              {thread.contentJson ? (
-                <PostRichTextContent contentJson={thread.contentJson} />
+              {thread.contentHtml ? (
+                <PostRichTextContent contentHtml={thread.contentHtml} />
               ) : (
-                <p className="whitespace-pre-wrap text-sm leading-6">
-                  {thread.body.content}
-                </p>
+                <p className="text-sm text-muted-foreground">This thread has no body yet.</p>
               )}
             </div>
           ) : (
@@ -175,15 +174,15 @@ export function PostDetailsClient() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {session?.user ? (
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <PostRichTextEditor
-                value={comment.json}
-                onChange={setComment}
-                ariaLabel="Reply editor"
-                helperText="Write a reply and add inline images."
-              />
-              <div className="flex justify-end">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <PostRichTextEditor
+              value={comment.json}
+              onChange={setComment}
+              ariaLabel="Reply editor"
+              helperText="Write a reply and add inline images."
+            />
+            <div className="flex justify-end">
+              {session?.user ? (
                 <Button
                   type="submit"
                   disabled={
@@ -192,15 +191,15 @@ export function PostDetailsClient() {
                   }
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  {createCommentMutation.isPending ? 'Posting...' : 'Post Reply'}
+                  {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
                 </Button>
-              </div>
-            </form>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Sign in to join the conversation.
-            </p>
-          )}
+              ) : (
+                <Button asChild>
+                  <Link href="/sign-in">Login to reply</Link>
+                </Button>
+              )}
+            </div>
+          </form>
 
           {replies.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -223,12 +222,10 @@ export function PostDetailsClient() {
                       </p>
                     </div>
                   </div>
-                  {reply.contentJson ? (
-                    <PostRichTextContent contentJson={reply.contentJson} />
+                  {reply.contentHtml ? (
+                    <PostRichTextContent contentHtml={reply.contentHtml} />
                   ) : (
-                    <p className="whitespace-pre-wrap text-sm leading-6">
-                      {reply.content}
-                    </p>
+                    <p className="text-sm text-muted-foreground">This reply has no renderable content.</p>
                   )}
                 </div>
               ))}
