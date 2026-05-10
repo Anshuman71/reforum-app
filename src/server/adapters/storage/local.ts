@@ -10,6 +10,16 @@ export function localStorageAdapter(): StorageAdapter {
   const dir = join(process.cwd(), "public", "uploads");
 
   return {
+    async prepareUpload({ storagePath }) {
+      return {
+        strategy: 'server',
+        uploadUrl: `/api/uploads/local?storagePath=${encodeURIComponent(storagePath)}`,
+        method: 'POST',
+        publicUrl: `/uploads/${storagePath}`,
+        storagePath,
+      };
+    },
+
     async upload(file, path, _mimeType) {
       const fullPath = join(dir, path);
       const dirPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
