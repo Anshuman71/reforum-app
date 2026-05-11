@@ -16,7 +16,7 @@ import * as HttpStatusPhrases from 'stoker/http-status-phrases';
 import { tags, posts, postTags } from '@/server/db/schema';
 import { ReforumApiError } from '@/server/errors';
 import slugify from 'slugify';
-import { isAuthorized } from '@/server/api-auth';
+import { requirePermission } from '@/server/api-auth';
 import { emitBeforeEvent, emitAfterEvent } from '@/server/lib/events';
 
 export const list: AppRouteHandler<ListRoute> = async c => {
@@ -33,10 +33,9 @@ export const list: AppRouteHandler<ListRoute> = async c => {
 };
 
 export const create: AppRouteHandler<CreateRoute> = async c => {
-  await isAuthorized(c);
   const data = c.req.valid('json');
-  const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const user = requirePermission(c, 'tag', 'create');
+  const actor = { id: user.id, role: user.role };
 
   const ctx = await emitBeforeEvent('tag:beforeCreate', {
     data: { name: data.name },
@@ -79,8 +78,8 @@ export const get: AppRouteHandler<GetRoute> = async c => {
 export const update: AppRouteHandler<UpdateRoute> = async c => {
   const data = c.req.valid('param');
   const { name } = c.req.valid('json');
-  const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const user = requirePermission(c, 'tag', 'update');
+  const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.tags.findFirst({
     where: eq(tags.id, data.id),
@@ -115,8 +114,8 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
 
 export const deleteById: AppRouteHandler<DeleteRoute> = async c => {
   const data = c.req.valid('param');
-  const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const user = requirePermission(c, 'tag', 'delete');
+  const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.tags.findFirst({
     where: eq(tags.id, data.id),

@@ -1,8 +1,12 @@
 import type { Context } from 'hono';
 import { ReforumApiError } from '../errors';
 import { AuthedVariables } from '@/types';
-
-type Role = 'user' | 'moderator' | 'admin';
+import {
+  hasPermission,
+  type PermissionAction,
+  type PermissionResource,
+  type Role,
+} from '@/server/lib/permissions';
 
 const ROLE_HIERARCHY: Record<Role, number> = {
   user: 0,
@@ -37,5 +41,49 @@ export function isAuthorized(
         message: 'Insufficient permissions to perform this action',
       });
     }
+  }
+}
+
+export function requirePermission<Resource extends PermissionResource>(
+  c: Context<{ Variables: AuthedVariables }>,
+  resource: Resource,
+  action: PermissionAction<Resource>
+) {
+  const user = c.get('user');
+
+  if (!user) {
+    throw new ReforumApiError({
+      code: 'UNAUTHORIZED',
+      message: 'Authentication required',
+    });
+  }
+
+  if (!hasPermission(user.role, resource, action)) {
+    throw new ReforumApiError({
+      code: 'FORBIDDEN',
+      message: 'Insufficient permissions to perform this action',
+    });
+  }
+
+  return user;
+}
+
+export function requireActorPermission<Resource extends PermissionResource>(
+  actor: { role: string } | null,
+  resource: Resource,
+  action: PermissionAction<Resource>
+) {
+  if (!actor) {
+    throw new ReforumApiError({
+      code: 'UNAUTHORIZED',
+      message: 'Authentication required',
+    });
+  }
+
+  if (!hasPermission(actor.role, resource, action)) {
+    throw new ReforumApiError({
+      code: 'FORBIDDEN',
+      message: 'Insufficient permissions to perform this action',
+    });
   }
 }

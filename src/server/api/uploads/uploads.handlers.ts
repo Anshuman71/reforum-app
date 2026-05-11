@@ -8,6 +8,7 @@ import { uploads, users } from "@/server/db/schema";
 import { newId } from "@/server/lib/id";
 import { eq } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { requirePermission } from "@/server/api-auth";
 import type {
   CompleteAvatarUploadRoute,
   CompleteContentImageUploadRoute,
@@ -24,17 +25,6 @@ const ALLOWED_AVATAR_TYPES = new Set([
 ]);
 const MAX_CONTENT_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_CONTENT_IMAGE_TYPES = ALLOWED_AVATAR_TYPES;
-
-function assertAuthenticated(user: { id: string } | null): { id: string } {
-  if (!user) {
-    throw new ReforumApiError({
-      code: "UNAUTHORIZED",
-      message: "Authentication required",
-    });
-  }
-
-  return user;
-}
 
 function assertAvatarInput(mimeType: string, size: number) {
   if (!ALLOWED_AVATAR_TYPES.has(mimeType)) {
@@ -131,7 +121,7 @@ function assertContentImageStoragePath(userId: string, storagePath: string) {
 export const prepareAvatarUpload: AppRouteHandler<
   PrepareAvatarUploadRoute
 > = async (c) => {
-  const user = assertAuthenticated(c.get("user"));
+  const user = requirePermission(c, "upload", "create-avatar");
   const payload = c.req.valid("json");
 
   assertAvatarInput(payload.mimeType, payload.size);
@@ -154,7 +144,7 @@ export const prepareAvatarUpload: AppRouteHandler<
 export const completeAvatarUpload: AppRouteHandler<
   CompleteAvatarUploadRoute
 > = async (c) => {
-  const user = assertAuthenticated(c.get("user"));
+  const user = requirePermission(c, "upload", "create-avatar");
   const payload = c.req.valid("json");
 
   assertAvatarInput(payload.mimeType, payload.size);
@@ -192,7 +182,7 @@ export const completeAvatarUpload: AppRouteHandler<
 export const prepareContentImageUpload: AppRouteHandler<
   PrepareContentImageUploadRoute
 > = async (c) => {
-  const user = assertAuthenticated(c.get("user"));
+  const user = requirePermission(c, "upload", "create-content");
   const payload = c.req.valid("json");
 
   assertContentImageInput(payload.mimeType, payload.size);
@@ -215,7 +205,7 @@ export const prepareContentImageUpload: AppRouteHandler<
 export const completeContentImageUpload: AppRouteHandler<
   CompleteContentImageUploadRoute
 > = async (c) => {
-  const user = assertAuthenticated(c.get("user"));
+  const user = requirePermission(c, "upload", "create-content");
   const payload = c.req.valid("json");
 
   assertContentImageInput(payload.mimeType, payload.size);
@@ -244,7 +234,6 @@ export const completeContentImageUpload: AppRouteHandler<
 };
 
 export async function uploadLocal(c: Context<{ Variables: AuthedVariables }>) {
-  const user = assertAuthenticated(c.get("user"));
   const storagePath = c.req.query("storagePath");
 
   if (!storagePath) {
@@ -264,10 +253,12 @@ export async function uploadLocal(c: Context<{ Variables: AuthedVariables }>) {
     });
   }
 
-  if (storagePath.startsWith(`avatars/${user.id}/`)) {
+  if (storagePath.startsWith("avatars/")) {
+    const user = requirePermission(c, "upload", "create-avatar");
     assertAvatarStoragePath(user.id, storagePath);
     assertAvatarInput(file.type, file.size);
-  } else if (storagePath.startsWith(`content/${user.id}/`)) {
+  } else if (storagePath.startsWith("content/")) {
+    const user = requirePermission(c, "upload", "create-content");
     assertContentImageStoragePath(user.id, storagePath);
     assertContentImageInput(file.type, file.size);
   } else {

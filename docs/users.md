@@ -214,13 +214,15 @@ Organizations would only be needed if we wanted things like:
 
 None of that is how the current runtime works today.
 
-## Remaining Cleanup Worth Doing
+## Organization Cleanup Status
 
-Even though the active auth/runtime path is already single-tenant, there is still one obvious cleanup item:
+The active auth/runtime path is single-tenant and the obvious org-era cleanup has been completed:
 
-- [src/server/lib/id.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/id.ts:28) still includes stale Better Auth prefixes for `member`, `organization`, and `invitation`.
+- [src/server/lib/id.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/id.ts:1) no longer includes Better Auth prefixes for `member`, `organization`, or `invitation`.
+- [src/server/lib/auth.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/auth.ts:1) does not configure the Better Auth organization plugin.
+- [src/server/db/schema.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/db/schema.ts:1) does not define `organizations`, `members`, or `invitations` tables.
 
-That does not mean org RBAC is active, but it is leftover support surface from the old model and should be cleaned up so the code matches the product direction more closely.
+Community-facing "member" language may still appear in UI copy, but that refers to a forum user, not an organization membership model.
 
 ## Practical Conclusion
 
@@ -233,7 +235,7 @@ Today’s structure is:
 - one optional `user_profiles` row for extended profile data,
 - no organization dependency in active auth or authorization flow.
 
-If we continue in this direction, the next step is not to add organizations back. The next step is to finish removing stale org-era leftovers and keep permissions centered on:
+If we continue in this direction, the next step is not to add organizations back. The next step is to keep permissions centered on:
 
 - global roles,
 - optional group/category access rules,

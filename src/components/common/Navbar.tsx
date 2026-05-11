@@ -214,12 +214,7 @@ export function Navbar() {
                       {session.user.email}
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">Settings</Link>
-                  </DropdownMenuItem>
+                  
                   <DropdownMenuItem
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingAvatar}

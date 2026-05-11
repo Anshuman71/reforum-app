@@ -5,6 +5,7 @@ import { newId } from '@/server/lib/id';
 import { emitAfterEvent, emitBeforeEvent } from '@/server/lib/events';
 import { ReforumApiError } from '@/server/errors';
 import type { Actor } from '@/server/lib/event-types';
+import { hasPermission } from '@/server/lib/permissions';
 import slugify from 'slugify';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -165,8 +166,17 @@ function requireActor(actor: NullableActor): Actor {
   return actor;
 }
 
-function assertCanManageContent(actor: Actor, authorId: string): void {
-  if (actor.role === 'admin' || actor.role === 'moderator' || actor.id === authorId) {
+function assertCanManageContent(
+  actor: Actor,
+  resource: 'post' | 'comment',
+  authorId: string,
+  action: 'update' | 'delete'
+): void {
+  if (hasPermission(actor.role, resource, action)) {
+    return;
+  }
+
+  if (actor.id === authorId && hasPermission(actor.role, resource, `${action}-own`)) {
     return;
   }
 
@@ -322,6 +332,10 @@ export async function createPost(input: {
   tags?: string[];
 }): Promise<FeedPost> {
   const actor = requireActor(input.actor);
+  if (!hasPermission(actor.role, 'post', 'create')) {
+    forbidden();
+  }
+
   const hasContent = hasRenderableContent({
     contentJson: input.contentJson,
     contentHtml: input.contentHtml,
@@ -537,6 +551,10 @@ export async function createComment(input: {
   replyToCommentId?: string | null;
 }) {
   const actor = requireActor(input.actor);
+  if (!hasPermission(actor.role, 'comment', 'create')) {
+    forbidden();
+  }
+
   const hasContent = hasRenderableContent({
     contentJson: input.contentJson,
     contentHtml: input.contentHtml,
@@ -624,7 +642,7 @@ export async function updatePost(input: {
     notFound('Post not found');
   }
 
-  assertCanManageContent(actor, existing.authorId);
+  assertCanManageContent(actor, 'post', existing.authorId, 'update');
 
   const ctx = await emitBeforeEvent('post:beforeUpdate', {
     entity: existing,
@@ -677,7 +695,7 @@ export async function deletePost(input: { id: string; actor: NullableActor }) {
     notFound('Post not found');
   }
 
-  assertCanManageContent(actor, existing.authorId);
+  assertCanManageContent(actor, 'post', existing.authorId, 'delete');
 
   await emitBeforeEvent('post:beforeDelete', {
     entity: existing,
@@ -723,7 +741,7 @@ export async function updateComment(input: {
     notFound('Comment not found');
   }
 
-  assertCanManageContent(actor, existing.authorId);
+  assertCanManageContent(actor, 'comment', existing.authorId, 'update');
 
   const ctx = await emitBeforeEvent('comment:beforeUpdate', {
     entity: existing,
@@ -760,7 +778,7 @@ export async function deleteComment(input: { id: string; actor: NullableActor })
     notFound('Comment not found');
   }
 
-  assertCanManageContent(actor, existing.authorId);
+  assertCanManageContent(actor, 'comment', existing.authorId, 'delete');
 
   await emitBeforeEvent('comment:beforeDelete', {
     entity: existing,

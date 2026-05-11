@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  createEmptyPostEditorValue,
   PostRichTextEditor,
   type PostEditorValue,
 } from '@/components/posts/PostRichTextEditor';
@@ -49,14 +50,7 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
     title: '',
     categoryId: '',
   });
-  const [editorValue, setEditorValue] = useState<PostEditorValue>({
-    text: '',
-    html: '<p></p>',
-    json: {
-      type: 'doc',
-      content: [{ type: 'paragraph' }],
-    },
-  });
+  const [editorValue, setEditorValue] = useState<PostEditorValue>(() => createEmptyPostEditorValue());
 
   useEffect(() => {
     if (open) {
@@ -115,14 +109,7 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
       }
 
       setFormData({ title: '', categoryId: '' });
-      setEditorValue({
-        text: '',
-        html: '<p></p>',
-        json: {
-          type: 'doc',
-          content: [{ type: 'paragraph' }],
-        },
-      });
+      setEditorValue(createEmptyPostEditorValue());
       setOpen(false);
 
       await queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.posts] });

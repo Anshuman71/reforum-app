@@ -20,7 +20,7 @@ Reforum is in late Stage 1. The app has moved beyond scaffolding and has a worki
 - Server-side author ownership is derived from the authenticated session.
 - S3-compatible storage support and direct-upload preparation exist.
 - Avatar upload and content image upload flows are present.
-- The current editor implementation uses Tiptap, but the product direction should move toward a lighter Markdown-first editor.
+- ~~The current editor implementation uses Tiptap, but the product direction should move toward a lighter Markdown-first editor.~~ The Slate editor is now the active implementation; Tiptap has been fully removed. Content is stored as Markdown (canonical) and HTML (derived).
 - Admin user management and role-based checks exist.
 - Event hooks exist through a lightweight serverless-safe `after()`-based event bus.
 
@@ -133,8 +133,8 @@ Moderators and admins should be able to review problematic content, remove or re
 - Support active post feeds with cursor pagination.
 - Support thread detail views with a primary post body and flat replies.
 - Treat Markdown as the canonical authoring and storage direction.
-- Keep the current Tiptap implementation until the Slate migration milestone.
-- Use Slate as the recommended next editor implementation path.
+- Keep ~~the current Tiptap implementation until the Slate migration milestone~~ using Slate as the editor implementation path.
+- Use Slate as the recommended editor implementation path.
 - Support a friendly editor experience without making the core content model dependent on one editor library.
 - Serialize editor content to Markdown as the canonical stored body and HTML as a derived/renderable representation.
 - Support images, GIFs, videos, and attachments as custom editor elements backed by the upload adapter.
@@ -291,7 +291,7 @@ Acceptance criteria:
 ### Next
 
 1. Transactional email provider integration.
-2. Slate-based Markdown-first editor migration.
+2. ~~Slate-based Markdown-first editor migration.~~ In progress: Slate editor is active; content stored as Markdown (canonical) and HTML (derived).
 3. Post/comment revision history.
 4. Moderation workflow and flag handling.
 5. Private category visibility scope spike.
@@ -331,7 +331,7 @@ Answered decisions:
 - Upload defaults: images, GIFs, and videos up to 100MB.
 - Admin settings scope: revisit iteratively as product work progresses.
 - Editor implementation: Slate is the recommended direction because it supports custom elements, app-defined HTML/Markdown serialization, media nodes, and inline mentions while fitting a Markdown-first OSS starter kit.
-- Editor sequencing: keep Tiptap for now and move Slate into the next milestone set.
+- ~~Editor sequencing: keep Tiptap for now and move Slate into the next milestone set.~~ Done: Tiptap removed; Slate is now the active editor.
 
 Remaining decisions:
 
@@ -343,7 +343,7 @@ Remaining decisions:
 - Moderation scope can grow quickly unless the first workflow is tightly defined.
 - Email and notification requirements depend heavily on deployment and provider choices.
 - Group/category access can accidentally become a tenant model if boundaries are not explicit.
-- Editor choice can create long-term migration cost if content storage is tied too tightly to Tiptap JSON.
+- ~~Editor choice can create long-term migration cost if content storage is tied too tightly to Tiptap JSON.~~ Tiptap has been removed; content is now stored as Markdown (canonical) and HTML (derived), reducing editor lock-in.
 - Framework portability will be harder later if Next-specific APIs continue leaking into services and adapters.
 - Admin-configurable custom roles require a database-backed role/permission model, not only static TypeScript role definitions.
 

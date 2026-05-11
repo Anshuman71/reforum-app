@@ -2,12 +2,12 @@ import type { AppRouteHandler } from '@/types';
 import { db } from '@/server/db';
 import { users } from '@/server/db/schema';
 import { eq, or, ilike } from 'drizzle-orm';
-import { isAuthorized } from '@/server/api-auth';
+import { requirePermission } from '@/server/api-auth';
 import * as HttpStatusCodes from 'stoker/http-status-codes';
 import type { ListUsersRoute, UpdateUserRoleRoute } from './admin.routes';
 
 export const listUsers: AppRouteHandler<ListUsersRoute> = async (c) => {
-  isAuthorized(c, 'admin');
+  requirePermission(c, 'users', 'read');
 
   const { search } = c.req.valid('query');
 
@@ -37,7 +37,7 @@ export const listUsers: AppRouteHandler<ListUsersRoute> = async (c) => {
 };
 
 export const updateUserRole: AppRouteHandler<UpdateUserRoleRoute> = async (c) => {
-  isAuthorized(c, 'admin');
+  requirePermission(c, 'users', 'update');
 
   const { userId, role } = c.req.valid('json');
 

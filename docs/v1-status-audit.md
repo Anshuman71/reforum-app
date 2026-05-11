@@ -4,13 +4,15 @@ Reference design: [v1-design.md](./v1-design.md)
 
 ## Current Stage
 
-The codebase is currently in **late Stage 1**, with most of **Milestone 1** completed, **Milestone 3** partially scaffolded, and the project approaching the first infrastructure-heavy milestone.
+The codebase is in **mid Stage 2**, with **Milestone 1A** and **Milestone 2A** complete. **Milestone 2B** (permission-driven RBAC) is the active milestone and has not yet started implementation.
 
 In practical terms:
 
-- There is already a working vertical slice for auth, posts, categories, comments, and some admin tooling.
-- The app is beyond raw scaffolding and now has a more reliable forum backbone.
-- The biggest remaining gap is no longer basic forum flow; it is production-grade infrastructure around storage, permissions, and provider-backed integrations.
+- There is a working forum foundation with auth, posts, categories, comments, tags, admin tooling, and cursor pagination.
+- S3-compatible storage with presigned direct uploads is implemented and working for both avatars and content images.
+- The Tiptap editor has been fully removed; the Slate-based editor is now the only rich text editor.
+- The legacy `content` field has been removed from posts and comments (replaced by `bodyMarkdown`/`bodyHtml`).
+- The biggest remaining gap is permission-driven RBAC; email provider integration; and completing product hardening around moderation, notifications, and search.
 
 ## What Exists Today
 
@@ -26,6 +28,13 @@ In practical terms:
 - Thread detail rendering is now functional instead of placeholder-only.
 - The server no longer trusts client-sent authorship for post and comment creation.
 - Provider seams now exist for email and storage adapters.
+- S3-compatible storage adapter with presigned direct uploads is implemented and production-ready.
+- Local storage adapter serves as the development fallback.
+- Avatar upload and content image upload flows are both implemented end-to-end.
+- The Slate rich text editor is the active editor; all Tiptap code and dependencies have been removed.
+- The legacy `content` column has been removed from posts and comments; content is now stored as `bodyMarkdown` (canonical) with `bodyHtml` as the derived/renderable representation.
+- Upload file names are hashed server-side to avoid collisions and leak-free storage paths.
+- Error handling has been improved with structured HTTP error responses.
 
 ### Evidence in the codebase
 
@@ -40,6 +49,12 @@ In practical terms:
 - Posts handlers: [src/server/api/posts/posts.handlers.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api/posts/posts.handlers.ts:35)
 - Forum services: [src/server/services/forum.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/services/forum.ts:1)
 - Thread page: [src/components/posts/PostDetailPage.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/components/posts/PostDetailPage.tsx:1)
+- Slate editor: [src/components/posts/PostRichTextEditor.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/components/posts/PostRichTextEditor.tsx:1)
+- HTML renderer: [src/components/posts/PostRichTextContent.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/components/posts/PostRichTextContent.tsx:1)
+- Upload utilities: [src/lib/upload-utils.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/lib/upload-utils.ts:1)
+- S3 adapter: [src/server/adapters/storage/s3.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/adapters/storage/s3.ts:1)
+- Upload API: [src/server/api/uploads/uploads.handlers.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api/uploads/uploads.handlers.ts:1)
+- Structured errors: [src/server/errors/http.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/errors/http.ts:1)
 
 ## Gap Against The V1 Design
 
@@ -53,10 +68,17 @@ The following parts of the design are still incomplete or not aligned with the i
 
 ### Milestone 2 and infra gaps
 
-- Serverless storage via presigned URLs is not implemented.
-- Current storage adapter is local filesystem based, which is useful for development but not aligned with the serverless design.
-- No S3-compatible storage adapter exists yet.
-- Avatar upload flow is not implemented yet.
+- ~~Serverless storage via presigned URLs is not implemented.~~ **Done.** Presigned direct uploads and local relay fallback are both implemented.
+- ~~Current storage adapter is local filesystem based, which is useful for development but not aligned with the serverless design.~~ **Done.** S3-compatible adapter is now the production path; local adapter is the dev fallback.
+- ~~No S3-compatible storage adapter exists yet.~~ **Done.** `src/server/adapters/storage/s3.ts` implements presigned PUT uploads.
+- ~~Avatar upload flow is not implemented yet.~~ **Done.** Avatar and content image uploads both work end-to-end.
+
+### Editor and content model gaps
+
+- ~~The editor implementation still uses Tiptap.~~ **Done.** Tiptap has been fully removed; Slate is now the active editor.
+- ~~Post/comment content model is ambiguous.~~ **Done.** The legacy `content` field has been removed. Content is now stored as `bodyMarkdown` (canonical) with `bodyHtml` (derived renderable).
+- The Slate editor still has a known crash in `isMarkActive` when void image nodes affect selection paths — this needs a more robust fix.
+- `@floating-ui/react` ~~remains in `package.json` but is no longer imported from any source file; it can be removed as cleanup.~~ Removed from `package.json`.
 
 ### Partial alignment issues
 
@@ -68,14 +90,14 @@ The following parts of the design are still incomplete or not aligned with the i
 
 The project is best described as:
 
-**A functioning forum foundation that now needs infrastructure and authorization hardening.**
+**A functioning forum with production-safe storage that now needs authorization hardening, email integration, and product hardening.**
 
 That means:
 
-- usable for internal iteration,
-- strong enough to support storage and notification work,
-- close to calling Milestone 1 complete from an application-flow perspective,
-- not yet ready to call the platform foundation complete.
+- usable for real iteration on discussion, auth, and media flows,
+- production-safe for file uploads on both S3 and local development paths,
+- close to completing the platform storage and content model direction,
+- still needing RBAC, email, moderation, notifications, and search to close out V1 foundation work.
 
 ## First Recommended Milestone
 
@@ -98,9 +120,10 @@ Milestone 1A is complete.
 What remains from the broader Stage 1 design is mostly:
 
 - provider-backed email,
-- storage infrastructure,
 - stronger permission-driven RBAC,
 - stricter modular boundaries.
+
+~~Storage infrastructure~~ is now complete (Milestone 2A).
 
 The next best work should target platform capability, not more feed/thread cleanup.
 
@@ -137,7 +160,7 @@ The next best target is now authorization hardening.
 
 ## Milestone 2B: Permission-Driven RBAC Design
 
-Goal: shift authorization from mainly role-name checks to explicit permission checks aligned with the app’s single-tenant model.
+Goal: shift authorization from mainly role-name checks to explicit permission checks aligned with the app's single-tenant model.
 
 ### TODOs
 
@@ -148,14 +171,33 @@ Goal: shift authorization from mainly role-name checks to explicit permission ch
 - [ ] `R5` Keep global roles on `users.role`; do not reintroduce organizations for RBAC.
 - [ ] `R6` Remove stale org-era auth leftovers that no longer match the single-tenant direction.
 
-## Why This Should Be First
+## Recent Changes (Since M2A Completion)
 
-Storage is the best next step because the forum foundation is now stable enough to support it, and the v1 design treats direct uploads as a hard infrastructure guardrail.
+The following changes landed after Milestone 2A was marked complete and represent progress toward editor migration and content model cleanup:
 
-Without this step:
+1. **Tiptap removal** — All Tiptap editor code, components, hooks, and `@tiptap/*` dependencies have been removed. The Slate-based `PostRichTextEditor` and `PostRichTextContent` are now the sole editor implementation. Extracted `handleImageUpload` and `MAX_FILE_SIZE` into `src/lib/upload-utils.ts`.
 
-- media work stays blocked on local filesystem assumptions,
-- avatars and richer composer uploads cannot move to a production-safe path,
-- later notification and moderation features still lack the real-world infrastructure base they expect.
+2. **Content model migration** — The legacy `content` field has been removed from posts and comments (migration `0003_charming_mister_fear`). Content is now stored as `bodyMarkdown` (canonical) and `bodyHtml` (derived), aligning with the PRD direction of Markdown as the canonical storage format.
 
-With Milestone 2A complete, the codebase will be in a much better position to move into notification center work, media enhancements, and stronger authorization design safely.
+3. **Upload filename hashing** — Upload handlers now hash filenames server-side instead of using original filenames directly, preventing path collisions and leaking readable filenames into storage paths.
+
+4. **Post reply UI updates** — The thread detail page reply box received UI polish.
+
+5. **Structured error responses** — The Hono error handling layer now uses structured HTTP error responses instead of generic error objects.
+
+6. **Provider seams** — `src/server/lib/envs.ts` now defines the provider configuration shape for S3 and storage, and event types were updated to reflect current content model fields.
+
+## Why M2B Should Be Next
+
+Authorization is the highest-priority gap because:
+
+- Permission vocabulary becomes expensive to change the longer it is deferred.
+- Category visibility and moderation actions both depend on permission checks.
+- The current role-only checks will not scale toward admin-configurable custom roles.
+- All subsequent product features (moderation, notifications, search scope) reference permissions.
+
+Without M2B:
+
+- admin and moderator actions remain hardcoded to role strings,
+- category visibility cannot be driven by role/group permission data,
+- custom role creation in the dashboard has no runtime enforcement layer.

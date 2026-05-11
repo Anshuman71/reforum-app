@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -13,18 +13,10 @@ import { Button } from '@/components/ui/button';
 import { useSession } from '@/lib/auth-client';
 import { PostRichTextContent } from '@/components/posts/PostRichTextContent';
 import {
+  createEmptyPostEditorValue,
   PostRichTextEditor,
   type PostEditorValue,
 } from '@/components/posts/PostRichTextEditor';
-
-const EMPTY_EDITOR_VALUE: PostEditorValue = {
-  text: '',
-  html: '<p></p>',
-  json: {
-    type: 'doc',
-    content: [{ type: 'paragraph' }],
-  },
-};
 
 function AuthorAvatar(props: {
   id: string;
@@ -41,35 +33,18 @@ function AuthorAvatar(props: {
   );
 }
 
-export function PostDetailsClient() {
-  const params = useParams<{ id: string; slug: string }>();
-  const postId = params.id;
+function ReplyForm(props: { postId: string; isSignedIn: boolean }) {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-  const [comment, setComment] = useState<PostEditorValue>(EMPTY_EDITOR_VALUE);
-
-  const threadQuery = useQuery({
-    queryKey: [QUERY_KEYS.thread, postId],
-    queryFn: () => getThread(postId),
-    enabled: Boolean(postId),
-  });
-
-  const commentsQuery = useInfiniteQuery({
-    queryKey: [QUERY_KEYS.threadComments, postId],
-    queryFn: ({ pageParam }) =>
-      getThreadComments(postId, {
-        cursor: typeof pageParam === 'string' ? pageParam : undefined,
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(postId),
-  });
+  const commentRef = useRef<PostEditorValue>(createEmptyPostEditorValue());
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [resetValue, setResetValue] = useState<PostEditorValue>(() => createEmptyPostEditorValue());
+  const [resetKey, setResetKey] = useState<number>();
 
   const createCommentMutation = useMutation({
     mutationFn: async (content: PostEditorValue) => {
       const res = await client.comments.$post({
         json: {
-          postId,
+          postId: props.postId,
           contentHtml: content.html,
           contentJson: content.json,
           replyToCommentId: null,
@@ -84,20 +59,80 @@ export function PostDetailsClient() {
       return payload;
     },
     onSuccess: async () => {
-      setComment(EMPTY_EDITOR_VALUE);
+      const emptyValue = createEmptyPostEditorValue();
+      commentRef.current = emptyValue;
+      setCanSubmit(false);
+      setResetValue(emptyValue);
+      setResetKey((key) => (key ?? 0) + 1);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.thread, postId] }),
-        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.threadComments, postId] }),
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.thread, props.postId] }),
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.threadComments, props.postId] }),
       ]);
     },
   });
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!session?.user) return;
-    if (!comment.text.trim() && !comment.html.includes('<img')) return;
-    await createCommentMutation.mutateAsync(comment);
+    if (!props.isSignedIn) return;
+    if (!canSubmit) return;
+    await createCommentMutation.mutateAsync(commentRef.current);
   };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <PostRichTextEditor
+        value={resetValue.json}
+        resetKey={resetKey}
+        onChange={(nextValue) => {
+          commentRef.current = nextValue;
+          const nextCanSubmit = Boolean(nextValue.text.trim() || nextValue.html.includes('<img'));
+          setCanSubmit((currentCanSubmit) =>
+            currentCanSubmit === nextCanSubmit ? currentCanSubmit : nextCanSubmit
+          );
+        }}
+        ariaLabel="Reply editor"
+        helperText="Write a reply and add inline images."
+      />
+      <div className="flex justify-end">
+        {props.isSignedIn ? (
+          <Button
+            type="submit"
+            disabled={createCommentMutation.isPending || !canSubmit}
+          >
+            <Send className="mr-2 h-4 w-4" />
+            {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href="/sign-in">Login to reply</Link>
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+export function PostDetailsClient() {
+  const params = useParams<{ id: string; slug: string }>();
+  const postId = params.id;
+  const { data: session } = useSession();
+
+  const threadQuery = useQuery({
+    queryKey: [QUERY_KEYS.thread, postId],
+    queryFn: () => getThread(postId),
+    enabled: Boolean(postId),
+  });
+
+  const commentsQuery = useInfiniteQuery({
+    queryKey: [QUERY_KEYS.threadComments, postId],
+    queryFn: ({ pageParam }) =>
+      getThreadComments(postId, {
+        cursor: typeof pageParam === 'string' ? pageParam : undefined,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: Boolean(postId),
+  });
 
   if (threadQuery.isLoading || commentsQuery.isLoading) {
     return <div>Loading thread...</div>;
@@ -217,32 +252,7 @@ export function PostDetailsClient() {
             </div>
           ) : null}
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <PostRichTextEditor
-              value={comment.json}
-              onChange={setComment}
-              ariaLabel="Reply editor"
-              helperText="Write a reply and add inline images."
-            />
-            <div className="flex justify-end">
-              {session?.user ? (
-                <Button
-                  type="submit"
-                  disabled={
-                    createCommentMutation.isPending ||
-                    (!comment.text.trim() && !comment.html.includes('<img'))
-                  }
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
-                </Button>
-              ) : (
-                <Button asChild>
-                  <Link href="/sign-in">Login to reply</Link>
-                </Button>
-              )}
-            </div>
-          </form>
+          <ReplyForm postId={postId} isSignedIn={Boolean(session?.user)} />
         </CardContent>
       </Card>
     </div>

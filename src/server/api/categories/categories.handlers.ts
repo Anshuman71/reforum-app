@@ -15,17 +15,11 @@ import * as HttpStatusPhrases from 'stoker/http-status-phrases';
 import { categories } from '@/server/db/schema';
 import { ReforumApiError } from '@/server/errors';
 import { emitBeforeEvent, emitAfterEvent } from '@/server/lib/events';
+import { requirePermission } from '@/server/api-auth';
 
 export const create: AppRouteHandler<CreateRoute> = async c => {
   const data = c.req.valid('json');
-  const user = c.get('user');
-
-  if (user?.role !== 'admin') {
-    throw new ReforumApiError({
-      message: 'Only admins can create categories',
-      code: 'FORBIDDEN',
-    });
-  }
+  const user = requirePermission(c, 'category', 'create');
 
   const actor = { id: user.id, role: user.role };
 
@@ -87,8 +81,8 @@ export const get: AppRouteHandler<GetRoute> = async c => {
 export const update: AppRouteHandler<UpdateRoute> = async c => {
   const { id } = c.req.valid('param');
   const data = c.req.valid('json');
-  const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const user = requirePermission(c, 'category', 'update');
+  const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.categories.findFirst({
     where: eq(categories.id, id),
@@ -121,8 +115,8 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
 
 export const remove: AppRouteHandler<DeleteRoute> = async c => {
   const data = c.req.valid('param');
-  const user = c.get('user');
-  const actor = user ? { id: user.id, role: user.role } : { id: 'system', role: 'system' };
+  const user = requirePermission(c, 'category', 'delete');
+  const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.categories.findFirst({
     where: eq(categories.id, data.id),

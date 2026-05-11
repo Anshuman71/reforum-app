@@ -28,13 +28,10 @@ const prefixes: Record<string, string> = {
   account: 'acc',
   session: 'sess',
   verification: 'ver',
-  member: 'mem',
   'rate-limit': 'rl',
   jwks: 'jwks',
-  organization: 'org',
   passkey: 'psk',
   'two-factor': '2fa',
-  invitation: 'inv',
 
   // platform models
   comment: 'com',
