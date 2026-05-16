@@ -4,7 +4,7 @@ Reference design: [v1-design.md](./v1-design.md)
 
 ## Current Stage
 
-The codebase is in **mid Stage 2**, with **Milestone 1A**, **Milestone 2A**, and **Milestone 2B** complete at the V1 foundation level. Remaining RBAC work is now product expansion: future moderation workflows and broader integration coverage.
+The codebase is in **mid Stage 2**, with **Milestone 1A**, **Milestone 2A**, and **Milestone 2B** complete at the V1 foundation level. RBAC is complete enough to unblock the rest of V1; remaining RBAC work is hardening and downstream feature consumption, not foundational authorization design.
 
 In practical terms:
 
@@ -12,7 +12,8 @@ In practical terms:
 - S3-compatible storage with presigned direct uploads is implemented and working for both avatars and content images.
 - The Tiptap editor has been fully removed; the Slate-based editor is now the only rich text editor.
 - The legacy `content` field has been removed from posts and comments (replaced by `bodyMarkdown`/`bodyHtml`).
-- The biggest remaining gaps are email provider integration and completing product hardening around moderation, notifications, and search.
+- Email now has an adapter contract, shared auth-email utilities, and a Resend blueprint, but the default runtime config still uses noop email until provider env/config is enabled.
+- The biggest remaining gaps are email provider activation/config docs and product hardening around moderation, notifications, search, and revision history.
 
 ## What Exists Today
 
@@ -28,6 +29,7 @@ In practical terms:
 - Thread detail rendering is now functional instead of placeholder-only.
 - The server no longer trusts client-sent authorship for post and comment creation.
 - Provider seams now exist for email and storage adapters.
+- Email has a reusable `sendEmail` adapter contract, a noop default adapter, shared verification/password-reset email utilities, and a Resend HTTP adapter blueprint.
 - S3-compatible storage adapter with presigned direct uploads is implemented and production-ready.
 - Local storage adapter serves as the development fallback.
 - Avatar upload and content image upload flows are both implemented end-to-end.
@@ -43,11 +45,12 @@ In practical terms:
 - RBAC helper: [src/server/api-auth/index.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api-auth/index.ts:17)
 - Permission map: [src/server/lib/permissions.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/permissions.ts:1)
 - Shared role source: [src/lib/roles.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/lib/roles.ts:1)
-- Role management UI: [src/app/admin/settings/roles/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/admin/settings/roles/page.tsx:1)
-- Group management UI: [src/app/admin/settings/groups/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/admin/settings/groups/page.tsx:1)
+- Role management UI: [src/app/(forum)/admin/settings/roles/page.tsx](</Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/(forum)/admin/settings/roles/page.tsx:1>)
+- Group management UI: [src/app/(forum)/admin/settings/groups/page.tsx](</Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/(forum)/admin/settings/groups/page.tsx:1>)
+- Moderation command center: [src/app/(forum)/admin/moderation/page.tsx](</Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/(forum)/admin/moderation/page.tsx:1>)
 - Event bus placeholder: [src/server/lib/events.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/events.ts:116)
 - Main schema: [src/server/db/schema.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/db/schema.ts:19)
-- Posts page: [src/app/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/page.tsx:9)
+- Posts page: [src/app/(forum)/page.tsx](</Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/(forum)/page.tsx:9>)
 - Create post UI: [src/components/posts/CreatePostModal.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/components/posts/CreatePostModal.tsx:39)
 - Posts handlers: [src/server/api/posts/posts.handlers.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api/posts/posts.handlers.ts:35)
 - Forum services: [src/server/services/forum.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/services/forum.ts:1)
@@ -93,14 +96,14 @@ The following parts of the design are still incomplete or not aligned with the i
 
 The project is best described as:
 
-**A functioning forum with production-safe storage that now needs authorization hardening, email integration, and product hardening.**
+**A functioning forum with production-safe storage and permission-driven RBAC that now needs email integration and product hardening.**
 
 That means:
 
 - usable for real iteration on discussion, auth, and media flows,
 - production-safe for file uploads on both S3 and local development paths,
-- close to completing the platform storage and content model direction,
-- still needing RBAC, email, moderation, notifications, and search to close out V1 foundation work.
+- platform storage, content model, and RBAC foundation are now in place,
+- still needing email provider activation/config docs, moderation polish, notifications, search, and revision history to close out V1 foundation work.
 
 ## First Recommended Milestone
 
@@ -128,9 +131,9 @@ What remains from the broader Stage 1 design is mostly:
 
 ~~Storage infrastructure~~ is now complete (Milestone 2A).
 
-The next best work should target platform capability, not more feed/thread cleanup.
+The next best work should target provider-backed email and RBAC-dependent product features, not more feed/thread cleanup.
 
-## Next Target Milestone
+## Completed Milestone
 
 ## Milestone 2A: S3-Compatible Storage Foundation
 
@@ -158,8 +161,6 @@ The app now has:
 - avatar upload as the first end-to-end storage-backed client flow.
 
 The next best target is now provider-backed email.
-
-## Follow-Up Milestone
 
 ## Milestone 2B: Permission-Driven RBAC Design
 
@@ -197,18 +198,34 @@ Goal: shift authorization from mainly role-name checks to explicit permission ch
 
 ### Remaining RBAC Work
 
-M2B is complete at the foundation level, but RBAC still has follow-up work before the broader V1 product can be considered closed:
+M2B is complete at the foundation level. RBAC is not the current blocker for V1 feature sequencing, but the following follow-up work should happen as adjacent features are built:
 
-- **Moderation workflows**: a reports/flags workflow exists, including thread report actions, queue reads, review decisions, a moderator command center, and hide/delete/restore actions gated by explicit permissions. Remaining work is deeper workflow polish.
+- **Moderation workflows**: a reports/flags workflow exists, including thread report actions, queue reads, review decisions, a moderator command center, and hide/delete/restore actions gated by explicit permissions. Remaining work is deeper workflow polish, auditability, and notification outcomes.
 - **Integration coverage**: initial session-backed API integration coverage exists for moderation queue access, custom role assignment, and group-based private category visibility. Remaining coverage should include broader admin settings flows.
 - **RBAC hardening**: category visibility assignment validation and transactional updates are implemented. Remaining hardening should keep role/group/category permission business rules in services instead of growing handler logic.
 - **Downstream permission consumers**: notifications, search visibility, moderation outcomes, role-change events, and revision/edit-history visibility should consume the RBAC permission model rather than adding separate access rules.
 
 Recommended next sequence:
 
-1. Continue RBAC hardening by extracting heavier admin/category RBAC logic into services and broadening integration coverage.
-2. Build the moderation UI/command center on top of the new report submission, queue, review, and permission-gated moderator action APIs.
-3. Add focused integration coverage for authenticated user, moderator, admin, custom-role, and private-category flows.
+1. Configure and document provider-backed transactional email through the existing email adapter.
+2. Polish moderation workflows: review/audit details, report outcomes, and notification hooks.
+3. Build in-app notifications that consume existing forum, moderation, role, and system events.
+4. Add basic Postgres search with private-category visibility enforcement.
+5. Continue RBAC hardening opportunistically by extracting heavier admin/category rules into services and broadening integration coverage.
+
+## Next Target Milestone
+
+## Milestone 2C: Provider-Backed Email And Notification Foundation
+
+Goal: replace the noop email path with a real provider adapter and prepare the event-to-notification pipeline that moderation, role changes, replies, mentions, and system announcements can consume.
+
+### TODOs
+
+- [x] `E1` Add provider-backed transactional email through the existing email adapter boundary, with Resend as the planned default blueprint.
+- [x] `E2` Wire account verification and password reset delivery without hard-coding one owner policy.
+- [ ] `E3` Add configuration docs and environment validation for the email provider.
+- [ ] `E4` Start the notification foundation by mapping existing forum, moderation, role, and system events to notification candidates.
+- [ ] `E5` Keep durable queues and digest workflows deferred unless deployment constraints require them.
 
 ## Recent Changes (Since M2A Completion)
 
@@ -226,17 +243,13 @@ The following changes landed after Milestone 2A was marked complete and represen
 
 6. **Provider seams** — `src/server/lib/envs.ts` now defines the provider configuration shape for S3 and storage, and event types were updated to reflect current content model fields.
 
-## Why M2B Should Be Next
+## Why RBAC Can Now Stop Being The Primary Track
 
-Authorization is the highest-priority gap because:
+M2B has landed the core permission model:
 
-- Permission vocabulary becomes expensive to change the longer it is deferred.
-- Category visibility and moderation actions both depend on permission checks.
-- The current role-only checks will not scale toward admin-configurable custom roles.
-- All subsequent product features (moderation, notifications, search scope) reference permissions.
+- admin and moderator actions are no longer primarily hardcoded to role strings,
+- category visibility is driven by role/group audience data,
+- custom role creation has a runtime enforcement layer,
+- moderation and private category flows now have permission-gated APIs and UI entry points.
 
-Without M2B:
-
-- admin and moderator actions remain hardcoded to role strings,
-- category visibility cannot be driven by role/group permission data,
-- custom role creation in the dashboard has no runtime enforcement layer.
+The next features should build on that model instead of continuing RBAC in isolation. The main RBAC work left is keeping new product features aligned with `src/server/lib/permissions.ts` and moving growing business rules into services as they become complex.

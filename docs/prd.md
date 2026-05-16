@@ -1,7 +1,7 @@
 # Reforum V1 Product Requirements Document
 
 Status: Current working PRD
-Last updated: 2026-05-10
+Last updated: 2026-05-16
 
 ## Purpose
 
@@ -11,7 +11,7 @@ The V1 product should deliver a reliable, customizable forum foundation with pro
 
 ## Current Assessment
 
-Reforum is in late Stage 1. The app has moved beyond scaffolding and has a working forum backbone:
+Reforum is in mid Stage 2. The app has moved beyond scaffolding and has a working forum backbone:
 
 - Users can authenticate through Better Auth.
 - Posts, categories, comments, tags, and thread pages exist.
@@ -21,16 +21,16 @@ Reforum is in late Stage 1. The app has moved beyond scaffolding and has a worki
 - S3-compatible storage support and direct-upload preparation exist.
 - Avatar upload and content image upload flows are present.
 - ~~The current editor implementation uses Tiptap, but the product direction should move toward a lighter Markdown-first editor.~~ The Slate editor is now the active implementation; Tiptap has been fully removed. Content is stored as Markdown (canonical) and HTML (derived).
-- Admin user management and role-based checks exist.
+- Admin user management and permission-driven RBAC exist, including custom roles and role/group-scoped private category visibility.
+- A permission-gated moderation foundation exists for user reports, queue review, and hide/delete/restore decisions.
 - Event hooks exist through a lightweight serverless-safe `after()`-based event bus.
 
 The biggest remaining gaps are product hardening gaps, not basic forum flow gaps:
 
-- Authorization still needs to move from mostly role-name checks to explicit permission checks.
-- Permission storage must evolve from static TypeScript roles to a database-backed role/permission model.
-- Email is still a noop adapter; provider-backed transactional email is not integrated.
+- RBAC is complete at the V1 foundation level, but downstream features still need to consume the permission model consistently.
+- Email now has a reusable adapter contract, shared auth-email utilities, and a Resend HTTP adapter blueprint; the default runtime config still uses the noop adapter until provider env/config is enabled.
 - Notifications exist in schema/event direction but not as a complete user-facing product.
-- Moderation concepts exist in schema and roadmap, but the moderation workflow is not complete.
+- Moderation now has reports, queue review, and action APIs/UI, but still needs workflow polish and notification outcomes.
 - Strict modular boundary enforcement is still a future architecture task.
 - Search, bookmarks, saved posts, and durable workflow delivery are post-foundation milestones.
 
@@ -97,11 +97,11 @@ Users can sign up, sign in, maintain a profile, and upload an avatar.
 
 ### Administer The Community
 
-Admins can view users, change roles, and manage privileged areas. V1 should expand this into permission-driven checks rather than direct role branching.
+Admins can view users, change roles, manage custom roles, configure groups, configure private category audiences, and access privileged areas through permission-driven checks.
 
 ### Moderate Content
 
-Moderators and admins should be able to review problematic content, remove or restore content, and eventually process flags from users.
+Moderators and admins can review user-submitted flags, mark reports reviewed, and hide, delete, or restore content according to explicit permissions. V1 should continue polishing queue workflows and outcomes.
 
 ## Functional Requirements
 
@@ -123,8 +123,8 @@ Moderators and admins should be able to review problematic content, remove or re
 - Treat `user`, `moderator`, and `admin` as seeded default roles rather than the full long-term role system.
 - Store runtime roles and role-permission assignments in the database.
 - Resolve authorization from user role permissions, not from group membership.
-- Add a reusable server-side permission checker for Hono handlers and service-layer logic.
-- Replace sensitive direct role checks with permission checks.
+- Use reusable server-side permission checkers for Hono handlers and service-layer logic.
+- Keep sensitive direct role checks replaced by permission checks.
 - Preserve ownership rules where users can manage their own content unless the product decision says otherwise.
 - Remove stale organization-era auth/id surfaces that no longer match the single-tenant model.
 
@@ -148,7 +148,7 @@ Moderators and admins should be able to review problematic content, remove or re
 ### Categories And Groups
 
 - Categories organize discussions.
-- Categories should support private or restricted visibility in V1.
+- Categories support private or restricted visibility in V1.
 - Category visibility can be granted by role and by group membership.
 - Groups are for user display, categorization, and community identity.
 - Groups are not tenants and must not behave like organizations.
@@ -168,8 +168,9 @@ Moderators and admins should be able to review problematic content, remove or re
 
 ### Email
 
-- Replace the noop email adapter with a provider-backed transactional email integration.
-- Expose utilities and configuration hooks for account verification and password reset flows rather than hard-coding one owner policy.
+- Keep the reusable `sendEmail` adapter contract as the email provider boundary.
+- Provide provider adapters that can be swapped by self-hosters through `reforum.config.ts`.
+- Use shared utilities for account verification and password reset flows rather than hard-coding one owner policy.
 - Let Better Auth and project owners decide whether verified email is mandatory before posting.
 - Resend is the planned default provider unless changed by product decision.
 
@@ -184,10 +185,11 @@ Moderators and admins should be able to review problematic content, remove or re
 
 ### Moderation
 
-- Add a moderation queue or command center for reports/flags.
+- Provide a moderation queue or command center for reports/flags.
 - Support user-submitted flags in V1.
 - Support a review queue for moderators and admins.
 - Allow moderators and admins to act on content according to explicit permissions.
+- Add workflow polish around report status, auditability, moderation outcomes, and notifications.
 - Keep bans and shadowbans out of the first moderation milestone unless later moved into scope.
 
 ### Search And Discovery
@@ -271,33 +273,42 @@ Future portability requirement:
 
 - M1A: Core forum foundation.
 - M2A: S3-compatible storage foundation.
+- M2B: Permission-driven RBAC design.
+
+Completed M2B acceptance criteria:
+
+- [x] Permission vocabulary is finalized.
+- [x] Server-side permission helper exists.
+- [x] Runtime roles and role-permission assignments are database-backed.
+- [x] Default roles have static fallback behavior and can be represented in the role UI without reintroducing organizations.
+- [x] Admins can create custom roles and assign permissions in the dashboard.
+- [x] Category visibility can be configured with roles and groups without making groups the global permission source.
+- [x] Sensitive role checks are replaced by permission checks in the core admin, category, tag, upload, post/comment mutation, private category, and moderation paths.
+- [x] Global single-tenant role model remains intact.
+- [x] Stale organization-era leftovers are removed.
 
 ### Active
 
-- M2B: Permission-driven RBAC design.
+Post-RBAC product hardening.
 
 Acceptance criteria:
 
-- Permission vocabulary is finalized.
-- Server-side permission helper exists.
-- Runtime roles and role-permission assignments are database-backed.
-- Default roles are seeded.
-- Admins can create custom roles and assign permissions in the dashboard.
-- Category visibility can be configured with roles and groups without making groups the global permission source.
-- Sensitive role checks are replaced by permission checks.
-- Global single-tenant role model remains intact.
-- Stale organization-era leftovers are removed.
+- Transactional email provider can be integrated behind the email adapter; the Resend blueprint exists and runtime activation remains config-driven.
+- Moderation workflows are polished beyond the foundation queue/action flow.
+- In-app notifications consume forum, moderation, role, and system events.
+- Search respects private category visibility and permission rules.
+- Admin/category RBAC business rules are kept in services instead of growing handler logic.
 
 ### Next
 
-1. Transactional email provider integration.
-2. ~~Slate-based Markdown-first editor migration.~~ In progress: Slate editor is active; content stored as Markdown (canonical) and HTML (derived).
-3. Post/comment revision history.
-4. Moderation workflow and flag handling.
-5. Private category visibility scope spike.
-6. In-app notification center and event-to-notification defaults.
-7. Basic Postgres search.
-8. Modular boundary linting and future extensibility hooks.
+1. Configure and document the Resend adapter path in `reforum.config.ts`/environment docs.
+2. Moderation workflow polish, including outcome notifications and review/audit details.
+3. In-app notification center and event-to-notification defaults.
+4. Basic Postgres search with private-category visibility enforcement.
+5. Post/comment revision history.
+6. Modular boundary linting and future extensibility hooks.
+7. ~~Slate-based Markdown-first editor migration.~~ Done: Slate editor is active; content is stored as Markdown (canonical) and HTML (derived).
+8. ~~Private category visibility scope spike.~~ Done at the RBAC foundation level with role/group category audiences.
 
 ## Open Product Decisions
 
@@ -332,6 +343,7 @@ Answered decisions:
 - Admin settings scope: revisit iteratively as product work progresses.
 - Editor implementation: Slate is the recommended direction because it supports custom elements, app-defined HTML/Markdown serialization, media nodes, and inline mentions while fitting a Markdown-first OSS starter kit.
 - ~~Editor sequencing: keep Tiptap for now and move Slate into the next milestone set.~~ Done: Tiptap removed; Slate is now the active editor.
+- RBAC completion: M2B is complete at the foundation level; remaining RBAC work is hardening and downstream feature consumption.
 
 Remaining decisions:
 
@@ -339,13 +351,13 @@ Remaining decisions:
 
 ## Risks
 
-- Permission vocabulary can become expensive to change once spread through handlers and services.
+- Permission vocabulary can still become expensive to change as downstream notifications, search, revision visibility, and moderation outcomes adopt it.
 - Moderation scope can grow quickly unless the first workflow is tightly defined.
 - Email and notification requirements depend heavily on deployment and provider choices.
 - Group/category access can accidentally become a tenant model if boundaries are not explicit.
 - ~~Editor choice can create long-term migration cost if content storage is tied too tightly to Tiptap JSON.~~ Tiptap has been removed; content is now stored as Markdown (canonical) and HTML (derived), reducing editor lock-in.
 - Framework portability will be harder later if Next-specific APIs continue leaking into services and adapters.
-- Admin-configurable custom roles require a database-backed role/permission model, not only static TypeScript role definitions.
+- Admin-configurable custom roles now use a database-backed role/permission model; the remaining risk is keeping business rules centralized as admin features expand.
 
 ## PRD Finalization Checklist
 

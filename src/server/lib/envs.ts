@@ -27,6 +27,13 @@ const S3EnvSchema = z.object({
 
 export type S3Env = z.infer<typeof S3EnvSchema>;
 
+const ResendEmailEnvSchema = z.object({
+  RESEND_API_KEY: z.string(),
+  EMAIL_FROM: z.string(),
+});
+
+export type ResendEmailEnv = z.infer<typeof ResendEmailEnvSchema>;
+
 export function getEnvs() {
   const { data: env, error } = EnvSchema.safeParse(process.env);
 
@@ -44,6 +51,18 @@ export function getS3Envs() {
 
   if (error) {
     console.error("Invalid S3 env:");
+    console.error(JSON.stringify(error.flatten().fieldErrors, null, 2));
+    process.exit(1);
+  }
+
+  return env;
+}
+
+export function getResendEmailEnvs() {
+  const { data: env, error } = ResendEmailEnvSchema.safeParse(process.env);
+
+  if (error) {
+    console.error("Invalid Resend email env:");
     console.error(JSON.stringify(error.flatten().fieldErrors, null, 2));
     process.exit(1);
   }

@@ -6,6 +6,10 @@ import { db } from "@/server/db";
 import { newId } from "@/server/lib/id";
 import { emitAfterEvent } from "@/server/lib/events";
 import { getEnvs } from "@/server/lib/envs";
+import {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "@/server/adapters/email/auth";
 import { rateLimits } from "../db/schema";
 getEnvs();
 
@@ -15,6 +19,18 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      void sendPasswordResetEmail({ user, url }).catch((error) => {
+        console.error("Failed to send password reset email:", error);
+      });
+    },
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      void sendVerificationEmail({ user, url }).catch((error) => {
+        console.error("Failed to send verification email:", error);
+      });
+    },
   },
   database: drizzleAdapter(db, {
     provider: "pg",
