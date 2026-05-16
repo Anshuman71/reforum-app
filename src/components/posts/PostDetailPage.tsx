@@ -4,12 +4,29 @@ import { FormEvent, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { MessageCircle, Send } from 'lucide-react';
+import { Flag, MessageCircle, Send } from 'lucide-react';
 import BoaringAvatar from 'boring-avatars';
 import { client, getThread, getThreadComments, QUERY_KEYS } from '@/app/client-utils/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useSession } from '@/lib/auth-client';
 import { PostRichTextContent } from '@/components/posts/PostRichTextContent';
 import {
@@ -30,6 +47,104 @@ function AuthorAvatar(props: {
         <BoaringAvatar variant="marble" name={props.id} size={32} />
       </AvatarFallback>
     </Avatar>
+  );
+}
+
+type FlagReason = 'spam' | 'offensive' | 'off-topic' | 'other';
+
+function ReportContentDialog(props: {
+  targetType: 'post' | 'comment';
+  targetId: string;
+  isSignedIn: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<FlagReason>('spam');
+  const [details, setDetails] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const submitReport = async () => {
+    if (!props.isSignedIn) {
+      setMessage('Please sign in to report content.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage(null);
+
+    try {
+      const res = await client.moderation.flags.$post({
+        json: {
+          targetType: props.targetType,
+          targetId: props.targetId,
+          reason,
+          details: details.trim() || null,
+        },
+      });
+
+      if (!res.ok) {
+        setMessage('Unable to submit report.');
+        return;
+      }
+
+      setMessage('Report submitted.');
+      setDetails('');
+      setTimeout(() => setOpen(false), 700);
+    } catch (err) {
+      console.error('Failed to submit report:', err);
+      setMessage('Unable to submit report.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground">
+          <Flag className="mr-1.5 h-3.5 w-3.5" />
+          Report
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Report content</DialogTitle>
+          <DialogDescription>
+            Send this item to the moderation queue for review.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Select value={reason} onValueChange={value => setReason(value as FlagReason)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="spam">Spam</SelectItem>
+              <SelectItem value="offensive">Offensive</SelectItem>
+              <SelectItem value="off-topic">Off-topic</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <Textarea
+            value={details}
+            onChange={event => setDetails(event.target.value)}
+            placeholder="Add context for moderators..."
+            maxLength={5000}
+          />
+          {message ? (
+            <p className="text-sm text-muted-foreground">{message}</p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submitReport} disabled={isSubmitting}>
+            {isSubmitting ? 'Submitting...' : 'Submit report'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -78,6 +193,16 @@ function ReplyForm(props: { postId: string; isSignedIn: boolean }) {
     await createCommentMutation.mutateAsync(commentRef.current);
   };
 
+  if (!props.isSignedIn) {
+    return (
+      <div className="flex justify-end">
+        <Button asChild>
+          <Link href="/sign-in">Login to reply</Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <PostRichTextEditor
@@ -94,19 +219,13 @@ function ReplyForm(props: { postId: string; isSignedIn: boolean }) {
         helperText="Write a reply and add inline images."
       />
       <div className="flex justify-end">
-        {props.isSignedIn ? (
-          <Button
-            type="submit"
-            disabled={createCommentMutation.isPending || !canSubmit}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
-          </Button>
-        ) : (
-          <Button asChild>
-            <Link href="/sign-in">Login to reply</Link>
-          </Button>
-        )}
+        <Button
+          type="submit"
+          disabled={createCommentMutation.isPending || !canSubmit}
+        >
+          <Send className="mr-2 h-4 w-4" />
+          {createCommentMutation.isPending ? 'Posting...' : 'Reply'}
+        </Button>
       </div>
     </form>
   );
@@ -186,6 +305,13 @@ export function PostDetailsClient() {
                     {new Date(thread.body.createdAt).toLocaleString()}
                   </p>
                 </div>
+                <div className="ml-auto">
+                  <ReportContentDialog
+                    targetType="post"
+                    targetId={thread.id}
+                    isSignedIn={Boolean(session?.user)}
+                  />
+                </div>
               </div>
               {thread.contentHtml ? (
                 <PostRichTextContent contentHtml={thread.contentHtml} />
@@ -228,6 +354,13 @@ export function PostDetailsClient() {
                       <p className="text-xs text-muted-foreground">
                         {new Date(reply.createdAt).toLocaleString()}
                       </p>
+                    </div>
+                    <div className="ml-auto">
+                      <ReportContentDialog
+                        targetType="comment"
+                        targetId={reply.id}
+                        isSignedIn={Boolean(session?.user)}
+                      />
                     </div>
                   </div>
                   {reply.contentHtml ? (

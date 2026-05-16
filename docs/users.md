@@ -99,22 +99,17 @@ The comment in that middleware explicitly reflects this:
 
 ## RBAC Structure
 
-The RBAC helper is in [src/server/api-auth/index.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api-auth/index.ts:1).
+The RBAC helpers are in [src/server/api-auth/index.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api-auth/index.ts:1) and [src/server/lib/permissions.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/permissions.ts:1).
 
-Current hierarchy:
+Current behavior:
 
-- `admin` > `moderator` > `user`
+- `users.role` stores one global role key for each user.
+- `user`, `moderator`, and `admin` remain the default system roles.
+- Custom roles are stored in `roles` and `role_permissions`.
+- Runtime checks resolve explicit permissions, not organization membership.
+- System roles keep a static fallback matrix so bootstrap/default role behavior is stable even if seed data is missing.
 
-This is implemented as a simple numeric comparison:
-
-- `user = 0`
-- `moderator = 1`
-- `admin = 2`
-
-`isAuthorized(c, requiredRole)`:
-
-- throws `UNAUTHORIZED` if the user is not signed in,
-- throws `FORBIDDEN` if the signed-in user does not meet the required role level.
+The legacy `isAuthorized(c, requiredRole)` helper remains only as compatibility support for old role-hierarchy code. Sensitive runtime behavior should use `requirePermission`, `hasRolePermission`, or the service-layer permission helpers.
 
 This is global RBAC, not org RBAC.
 
@@ -173,8 +168,10 @@ That is different from a multi-tenant organization model.
 
 So:
 
-- `groups` may still be useful,
+- `groups` are useful as category audience segments,
 - `organizations` are not required for the current RBAC model.
+
+Admins can manage groups in [src/app/admin/settings/groups/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/admin/settings/groups/page.tsx:1). Groups can include users, and private categories can grant access to groups through `category_groups`.
 
 ## Current Community User Handling
 
@@ -185,8 +182,9 @@ At a high level, users in the community are handled like this:
 3. Better Auth manages sessions in `sessions`.
 4. The app resolves the current user from the session.
 5. The app reads the global `users.role`.
-6. That role controls privileged behavior across the whole app.
-7. Optional extended profile data can live in `user_profiles`.
+6. Permission helpers resolve role capabilities from the role/permission model.
+7. Optional group membership can grant access to private categories.
+8. Optional extended profile data can live in `user_profiles`.
 
 Content ownership also points directly to users:
 

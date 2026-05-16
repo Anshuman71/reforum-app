@@ -4,6 +4,7 @@ import { categoriesRouter } from '@/server/api/categories/categories.index';
 import { commentsRouter } from '@/server/api/comments/comments.index';
 import configureOpenAPI from '@/server/common/configure-open-api';
 import createApp from '@/server/common/create-app';
+import { moderationRouter } from '@/server/api/moderation/moderation.index';
 import { postsRouter } from '@/server/api/posts/posts.index';
 import { tagsRouter } from '@/server/api/tags/tags.index';
 import { uploadsRouter } from '@/server/api/uploads/uploads.index';
@@ -18,6 +19,7 @@ const routes = [
   categoriesRouter,
   tagsRouter,
   uploadsRouter,
+  moderationRouter,
 ] as const;
 
 app.get('/ping', c => c.text('Pong!'));

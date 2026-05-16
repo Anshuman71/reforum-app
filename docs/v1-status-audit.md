@@ -4,7 +4,7 @@ Reference design: [v1-design.md](./v1-design.md)
 
 ## Current Stage
 
-The codebase is in **mid Stage 2**, with **Milestone 1A** and **Milestone 2A** complete. **Milestone 2B** (permission-driven RBAC) is the active milestone and has not yet started implementation.
+The codebase is in **mid Stage 2**, with **Milestone 1A**, **Milestone 2A**, and **Milestone 2B** complete at the V1 foundation level. Remaining RBAC work is now product expansion: future moderation workflows and broader integration coverage.
 
 In practical terms:
 
@@ -12,14 +12,14 @@ In practical terms:
 - S3-compatible storage with presigned direct uploads is implemented and working for both avatars and content images.
 - The Tiptap editor has been fully removed; the Slate-based editor is now the only rich text editor.
 - The legacy `content` field has been removed from posts and comments (replaced by `bodyMarkdown`/`bodyHtml`).
-- The biggest remaining gap is permission-driven RBAC; email provider integration; and completing product hardening around moderation, notifications, and search.
+- The biggest remaining gaps are email provider integration and completing product hardening around moderation, notifications, and search.
 
 ## What Exists Today
 
 ### Working foundation pieces
 
 - Better Auth is wired with DB-backed sessions and custom ID generation.
-- RBAC exists and is enforced in admin flows.
+- Permission-driven RBAC exists and is enforced in admin, category, tag, upload, category visibility, and core post/comment mutation flows.
 - Posts, comments, categories, tags, admin users, and basic forum pages are present.
 - There is already a lightweight event hook system using `after()`.
 - The database schema includes several future-facing tables such as notifications, flags, uploads, bookmarks, votes, and reactions.
@@ -41,7 +41,10 @@ In practical terms:
 - Auth setup: [src/server/lib/auth.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/auth.ts:9)
 - Auth middleware: [src/server/common/middlewares.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/common/middlewares.ts:8)
 - RBAC helper: [src/server/api-auth/index.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/api-auth/index.ts:17)
-- Permission map draft: [src/server/lib/permissions.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/permissions.ts:1)
+- Permission map: [src/server/lib/permissions.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/permissions.ts:1)
+- Shared role source: [src/lib/roles.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/lib/roles.ts:1)
+- Role management UI: [src/app/admin/settings/roles/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/admin/settings/roles/page.tsx:1)
+- Group management UI: [src/app/admin/settings/groups/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/admin/settings/groups/page.tsx:1)
 - Event bus placeholder: [src/server/lib/events.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/lib/events.ts:116)
 - Main schema: [src/server/db/schema.ts](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/server/db/schema.ts:19)
 - Posts page: [src/app/page.tsx](/Users/anshumanbhardwaj/Documents/work/reforum-app/src/app/page.tsx:9)
@@ -64,7 +67,7 @@ The following parts of the design are still incomplete or not aligned with the i
 
 - Better Auth exists, but Resend/email integration is not yet present.
 - No strict modular boundaries are enforced yet as described in the design.
-- Permission-based RBAC is not yet the primary enforcement layer; current runtime checks are still mostly role-based.
+- Permission-based RBAC is now the primary enforcement layer for sensitive runtime mutations.
 
 ### Milestone 2 and infra gaps
 
@@ -84,7 +87,7 @@ The following parts of the design are still incomplete or not aligned with the i
 
 - The design calls for strictly flat threads with reply metadata handled as a lightweight reference pattern.
 - The current schema uses `replyToCommentId` on comments, which is workable, but it is not a clean match for the target model described in the design.
-- There are still stale org-era leftovers in auth support code, such as unused organization/member/invitation ID prefixes.
+- ~~There are still stale org-era leftovers in auth support code, such as unused organization/member/invitation ID prefixes.~~ **Done.** The stale ID prefixes have been removed; the app remains single-tenant with no Better Auth organization plugin.
 
 ## Honest Status Summary
 
@@ -120,7 +123,7 @@ Milestone 1A is complete.
 What remains from the broader Stage 1 design is mostly:
 
 - provider-backed email,
-- stronger permission-driven RBAC,
+- future moderation workflows,
 - stricter modular boundaries.
 
 ~~Storage infrastructure~~ is now complete (Milestone 2A).
@@ -154,7 +157,7 @@ The app now has:
 - a local relay fallback for development,
 - avatar upload as the first end-to-end storage-backed client flow.
 
-The next best target is now authorization hardening.
+The next best target is now provider-backed email.
 
 ## Follow-Up Milestone
 
@@ -164,12 +167,48 @@ Goal: shift authorization from mainly role-name checks to explicit permission ch
 
 ### TODOs
 
-- [ ] `R1` Finalize the permission vocabulary in `src/server/lib/permissions.ts`.
-- [ ] `R2` Decide the initial custom roles beyond `user`, `moderator`, and `admin` if needed.
-- [ ] `R3` Add a reusable server-side permission-check helper for services and route handlers.
-- [ ] `R4` Replace direct role branching in sensitive flows with permission-based checks where appropriate.
-- [ ] `R5` Keep global roles on `users.role`; do not reintroduce organizations for RBAC.
-- [ ] `R6` Remove stale org-era auth leftovers that no longer match the single-tenant direction.
+- [x] `R1` Finalize the permission vocabulary in `src/server/lib/permissions.ts`.
+- [x] `R2` Decide the initial custom roles beyond `user`, `moderator`, and `admin` if needed. No additional static roles are needed; custom roles are supported dynamically through the roles UI.
+- [x] `R3` Add a reusable server-side permission-check helper for services and route handlers.
+- [x] `R4` Replace direct role branching in sensitive flows with permission-based checks where appropriate.
+- [x] `R5` Keep global roles on `users.role`; do not reintroduce organizations for RBAC.
+- [x] `R6` Remove stale org-era auth leftovers that no longer match the single-tenant direction.
+
+### Current M2B Progress
+
+- `src/lib/roles.ts` now centralizes the current default role names (`user`, `moderator`, `admin`) for API and UI usage.
+- `src/server/lib/permissions.ts` now defines a typed permission vocabulary, the default role matrix, DB-backed permission lookup, category visibility helpers, and content ownership checks.
+- `src/server/api-auth/index.ts` now exposes reusable async permission guards for Hono handlers and service-layer actor checks.
+- Admin user APIs, category mutations, tag mutations, upload flows, admin layout access, and core post/comment create/update/delete service logic now use permission checks for sensitive behavior.
+- Admin role APIs can list available permissions, create/update/delete custom roles, and protect system roles from mutation.
+- The admin user-role assignment API validates against known roles, and the UI can assign custom roles.
+- `/admin/settings/roles` lets admins compose custom roles from known permissions.
+- Category reads and post feeds now hide private categories unless the actor has admin-level access, an allowed role, or an allowed group.
+- `/admin/settings/groups` lets admins create groups and assign users to them.
+- Category settings can mark categories private and assign allowed roles and groups.
+- Category role/group visibility assignments are validated before write and category visibility updates are transactional.
+- Admin user role assignment and group membership assignment now validate referenced users/roles before write.
+- Moderation now has a permission-gated API foundation for user-submitted flags, moderator/admin queue reads, flag review, and optional hide/delete/restore content actions.
+- Thread pages now expose report actions for posts and replies so authenticated users can submit flags into the moderation queue.
+- `/admin/moderation` provides a moderator command center for queue review and hide/delete/restore decisions; `/admin` routes moderators there when they do not have settings access.
+- Signed-out create-post and reply affordances now route users to sign-in instead of exposing forms they cannot submit.
+- Focused RBAC coverage exists in `tests/unit/permissions.test.ts`, `tests/unit/moderation.test.ts`, and `tests/integration/rbac-api.test.ts` for tag/category mutation permissions, moderator/admin paths, custom role permission lookup, default-role fallback behavior, session-backed moderation queue access, session-backed custom role assignment, group-based private category visibility, moderation review rules, and post/comment ownership rules.
+- Stale org-era Better Auth ID prefixes for `member`, `organization`, and `invitation` have been removed. The active Better Auth config still has no organization plugin, and the schema still has no organization/member/invitation tables.
+
+### Remaining RBAC Work
+
+M2B is complete at the foundation level, but RBAC still has follow-up work before the broader V1 product can be considered closed:
+
+- **Moderation workflows**: a reports/flags workflow exists, including thread report actions, queue reads, review decisions, a moderator command center, and hide/delete/restore actions gated by explicit permissions. Remaining work is deeper workflow polish.
+- **Integration coverage**: initial session-backed API integration coverage exists for moderation queue access, custom role assignment, and group-based private category visibility. Remaining coverage should include broader admin settings flows.
+- **RBAC hardening**: category visibility assignment validation and transactional updates are implemented. Remaining hardening should keep role/group/category permission business rules in services instead of growing handler logic.
+- **Downstream permission consumers**: notifications, search visibility, moderation outcomes, role-change events, and revision/edit-history visibility should consume the RBAC permission model rather than adding separate access rules.
+
+Recommended next sequence:
+
+1. Continue RBAC hardening by extracting heavier admin/category RBAC logic into services and broadening integration coverage.
+2. Build the moderation UI/command center on top of the new report submission, queue, review, and permission-gated moderator action APIs.
+3. Add focused integration coverage for authenticated user, moderator, admin, custom-role, and private-category flows.
 
 ## Recent Changes (Since M2A Completion)
 

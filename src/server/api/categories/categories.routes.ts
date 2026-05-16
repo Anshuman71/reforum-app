@@ -14,15 +14,25 @@ import { openApiErrorResponses } from '@/server/errors';
 const IdParamsSchema = getIdParamsSchema('category');
 
 export const categoriesSelectSchema = createSelectSchema(categories);
+const categoriesResponseSchema = categoriesSelectSchema.extend({
+  roleIds: z.array(z.string()).optional(),
+  groupIds: z.array(z.string()).optional(),
+});
 
 const categoriesCreateSchema = createInsertSchema(categories).omit({
   ...commonInsertOmitFields,
+}).extend({
+  roleIds: z.array(z.string()).optional(),
+  groupIds: z.array(z.string()).optional(),
 });
 
 const categoriesUpdateSchema = createInsertSchema(categories).pick({
   name: true,
   description: true,
   isPrivate: true,
+}).extend({
+  roleIds: z.array(z.string()).optional(),
+  groupIds: z.array(z.string()).optional(),
 });
 
 const API_TAG = ['Categories'];
@@ -40,7 +50,7 @@ export const create = createRoute({
   },
   responses: {
     [HttpStatusCodes.CREATED]: jsonContent(
-      categoriesSelectSchema,
+      categoriesResponseSchema,
       'The created categories'
     ),
     [HttpStatusCodes.UNPROCESSABLE_ENTITY]: jsonContent(
@@ -68,7 +78,7 @@ export const list = createRoute({
   },
   responses: {
     [HttpStatusCodes.OK]: jsonContent(
-      z.array(categoriesSelectSchema),
+      z.array(categoriesResponseSchema),
       'The requested categories'
     ),
     ...openApiErrorResponses,
@@ -88,7 +98,7 @@ export const getById = createRoute({
   },
   responses: {
     [HttpStatusCodes.OK]: jsonContent(
-      categoriesSelectSchema,
+      categoriesResponseSchema,
       'The requested categories'
     ),
     ...openApiErrorResponses,
@@ -109,7 +119,7 @@ export const updateById = createRoute({
   },
   responses: {
     [HttpStatusCodes.OK]: jsonContent(
-      categoriesSelectSchema,
+      categoriesResponseSchema,
       'The updated categories'
     ),
     ...openApiErrorResponses,

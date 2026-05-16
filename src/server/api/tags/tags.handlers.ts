@@ -34,7 +34,7 @@ export const list: AppRouteHandler<ListRoute> = async c => {
 
 export const create: AppRouteHandler<CreateRoute> = async c => {
   const data = c.req.valid('json');
-  const user = requirePermission(c, 'tag', 'create');
+  const user = await requirePermission(c, 'tag', 'create');
   const actor = { id: user.id, role: user.role };
 
   const ctx = await emitBeforeEvent('tag:beforeCreate', {
@@ -78,7 +78,7 @@ export const get: AppRouteHandler<GetRoute> = async c => {
 export const update: AppRouteHandler<UpdateRoute> = async c => {
   const data = c.req.valid('param');
   const { name } = c.req.valid('json');
-  const user = requirePermission(c, 'tag', 'update');
+  const user = await requirePermission(c, 'tag', 'update');
   const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.tags.findFirst({
@@ -114,7 +114,7 @@ export const update: AppRouteHandler<UpdateRoute> = async c => {
 
 export const deleteById: AppRouteHandler<DeleteRoute> = async c => {
   const data = c.req.valid('param');
-  const user = requirePermission(c, 'tag', 'delete');
+  const user = await requirePermission(c, 'tag', 'delete');
   const actor = { id: user.id, role: user.role };
 
   const existing = await db.query.tags.findFirst({

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/lib/auth";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
-import { hasPermission } from "@/server/lib/permissions";
+import { hasRolePermission } from "@/server/lib/permissions";
 import { eq } from "drizzle-orm";
 import { Suspense } from "react";
 
@@ -26,7 +26,10 @@ export default async function AdminLayout({
     .where(eq(users.id, session.user.id))
     .limit(1);
 
-  if (!hasPermission(dbUser?.role, "settings", "read")) {
+  const canReadSettings = await hasRolePermission(dbUser?.role, "settings", "read");
+  const canReadModeration = await hasRolePermission(dbUser?.role, "moderation", "read");
+
+  if (!canReadSettings && !canReadModeration) {
     redirect("/");
   }
 

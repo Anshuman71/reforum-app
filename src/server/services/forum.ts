@@ -5,7 +5,12 @@ import { newId } from '@/server/lib/id';
 import { emitAfterEvent, emitBeforeEvent } from '@/server/lib/events';
 import { ReforumApiError } from '@/server/errors';
 import type { Actor } from '@/server/lib/event-types';
-import { hasPermission } from '@/server/lib/permissions';
+import {
+  canAccessCategory,
+  canRoleManageContent,
+  getVisibleCategoryIds,
+  hasRolePermission,
+} from '@/server/lib/permissions';
 import slugify from 'slugify';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -166,17 +171,13 @@ function requireActor(actor: NullableActor): Actor {
   return actor;
 }
 
-function assertCanManageContent(
+async function assertCanManageContent(
   actor: Actor,
   resource: 'post' | 'comment',
   authorId: string,
   action: 'update' | 'delete'
-): void {
-  if (hasPermission(actor.role, resource, action)) {
-    return;
-  }
-
-  if (actor.id === authorId && hasPermission(actor.role, resource, `${action}-own`)) {
+): Promise<void> {
+  if (await canRoleManageContent(actor, resource, authorId, action)) {
     return;
   }
 
@@ -263,8 +264,17 @@ export async function listPosts(input: {
 }): Promise<CursorPage<FeedPost>> {
   const pageSize = getPageSize(input.limit);
   const cursor = decodeCursor<PostListCursor>(input.cursor);
+  const visibleCategoryIds = await getVisibleCategoryIds(input.actor);
 
-  const where = and(eq(posts.state, 'active'), buildPostCursorWhere(cursor));
+  if (visibleCategoryIds?.length === 0) {
+    return { items: [], nextCursor: null };
+  }
+
+  const where = and(
+    eq(posts.state, 'active'),
+    visibleCategoryIds ? inArray(posts.categoryId, visibleCategoryIds) : undefined,
+    buildPostCursorWhere(cursor)
+  );
 
   const rows = await db.query.posts.findMany({
     where,
@@ -332,7 +342,7 @@ export async function createPost(input: {
   tags?: string[];
 }): Promise<FeedPost> {
   const actor = requireActor(input.actor);
-  if (!hasPermission(actor.role, 'post', 'create')) {
+  if (!(await hasRolePermission(actor.role, 'post', 'create'))) {
     forbidden();
   }
 
@@ -370,6 +380,10 @@ export async function createPost(input: {
     });
 
     if (!category) {
+      notFound('Category not found');
+    }
+
+    if (!(await canAccessCategory(actor, category.id))) {
       notFound('Category not found');
     }
 
@@ -462,6 +476,10 @@ export async function getThread(postId: string, actor: NullableActor): Promise<T
     notFound('Post not found');
   }
 
+  if (!(await canAccessCategory(actor, post.categoryId))) {
+    notFound('Post not found');
+  }
+
   const body = await getBodyComment(postId);
   const counts = await getCommentCounts([postId]);
 
@@ -551,7 +569,7 @@ export async function createComment(input: {
   replyToCommentId?: string | null;
 }) {
   const actor = requireActor(input.actor);
-  if (!hasPermission(actor.role, 'comment', 'create')) {
+  if (!(await hasRolePermission(actor.role, 'comment', 'create'))) {
     forbidden();
   }
 
@@ -642,7 +660,7 @@ export async function updatePost(input: {
     notFound('Post not found');
   }
 
-  assertCanManageContent(actor, 'post', existing.authorId, 'update');
+  await assertCanManageContent(actor, 'post', existing.authorId, 'update');
 
   const ctx = await emitBeforeEvent('post:beforeUpdate', {
     entity: existing,
@@ -695,7 +713,7 @@ export async function deletePost(input: { id: string; actor: NullableActor }) {
     notFound('Post not found');
   }
 
-  assertCanManageContent(actor, 'post', existing.authorId, 'delete');
+  await assertCanManageContent(actor, 'post', existing.authorId, 'delete');
 
   await emitBeforeEvent('post:beforeDelete', {
     entity: existing,
@@ -741,7 +759,7 @@ export async function updateComment(input: {
     notFound('Comment not found');
   }
 
-  assertCanManageContent(actor, 'comment', existing.authorId, 'update');
+  await assertCanManageContent(actor, 'comment', existing.authorId, 'update');
 
   const ctx = await emitBeforeEvent('comment:beforeUpdate', {
     entity: existing,
@@ -778,7 +796,7 @@ export async function deleteComment(input: { id: string; actor: NullableActor })
     notFound('Comment not found');
   }
 
-  assertCanManageContent(actor, 'comment', existing.authorId, 'delete');
+  await assertCanManageContent(actor, 'comment', existing.authorId, 'delete');
 
   await emitBeforeEvent('comment:beforeDelete', {
     entity: existing,

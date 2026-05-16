@@ -121,7 +121,7 @@ function assertContentImageStoragePath(userId: string, storagePath: string) {
 export const prepareAvatarUpload: AppRouteHandler<
   PrepareAvatarUploadRoute
 > = async (c) => {
-  const user = requirePermission(c, "upload", "create-avatar");
+  const user = await requirePermission(c, "upload", "create-avatar");
   const payload = c.req.valid("json");
 
   assertAvatarInput(payload.mimeType, payload.size);
@@ -144,7 +144,7 @@ export const prepareAvatarUpload: AppRouteHandler<
 export const completeAvatarUpload: AppRouteHandler<
   CompleteAvatarUploadRoute
 > = async (c) => {
-  const user = requirePermission(c, "upload", "create-avatar");
+  const user = await requirePermission(c, "upload", "create-avatar");
   const payload = c.req.valid("json");
 
   assertAvatarInput(payload.mimeType, payload.size);
@@ -182,7 +182,7 @@ export const completeAvatarUpload: AppRouteHandler<
 export const prepareContentImageUpload: AppRouteHandler<
   PrepareContentImageUploadRoute
 > = async (c) => {
-  const user = requirePermission(c, "upload", "create-content");
+  const user = await requirePermission(c, "upload", "create-content");
   const payload = c.req.valid("json");
 
   assertContentImageInput(payload.mimeType, payload.size);
@@ -205,7 +205,7 @@ export const prepareContentImageUpload: AppRouteHandler<
 export const completeContentImageUpload: AppRouteHandler<
   CompleteContentImageUploadRoute
 > = async (c) => {
-  const user = requirePermission(c, "upload", "create-content");
+  const user = await requirePermission(c, "upload", "create-content");
   const payload = c.req.valid("json");
 
   assertContentImageInput(payload.mimeType, payload.size);
@@ -254,11 +254,11 @@ export async function uploadLocal(c: Context<{ Variables: AuthedVariables }>) {
   }
 
   if (storagePath.startsWith("avatars/")) {
-    const user = requirePermission(c, "upload", "create-avatar");
+    const user = await requirePermission(c, "upload", "create-avatar");
     assertAvatarStoragePath(user.id, storagePath);
     assertAvatarInput(file.type, file.size);
   } else if (storagePath.startsWith("content/")) {
-    const user = requirePermission(c, "upload", "create-content");
+    const user = await requirePermission(c, "upload", "create-content");
     assertContentImageStoragePath(user.id, storagePath);
     assertContentImageInput(file.type, file.size);
   } else {

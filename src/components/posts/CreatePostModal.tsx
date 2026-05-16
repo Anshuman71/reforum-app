@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useSession } from '@/lib/auth-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { client, QUERY_KEYS } from '@/app/client-utils/react-query';
@@ -130,6 +131,17 @@ export function CreatePostModal({ onPostCreated }: CreatePostModalProps) {
     formData.title.trim() &&
     (editorValue.text.trim() || editorValue.html.includes('<img')) &&
     formData.categoryId;
+
+  if (!session?.user) {
+    return (
+      <Button asChild className="flex items-center space-x-2">
+        <Link href="/sign-in">
+          <Plus className="h-4 w-4" />
+          <span>Create Post</span>
+        </Link>
+      </Button>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

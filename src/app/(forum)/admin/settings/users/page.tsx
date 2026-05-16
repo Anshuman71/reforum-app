@@ -24,27 +24,32 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   MoreHorizontal,
-  UserCheck,
-  UserX,
   Shield,
   User,
   Crown,
+  type LucideIcon,
 } from 'lucide-react';
 import { client } from '@/app/client-utils/react-query';
 interface ForumUser {
   id: string;
   email: string;
   name: string;
-  role: 'user' | 'moderator' | 'admin';
+  role: string;
   createdAt: string;
 }
 
-const roleConfig = {
+interface ForumRole {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+}
+
+const roleConfig: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   admin: { label: 'Admin', icon: Crown, color: 'bg-purple-100 text-purple-800' },
   moderator: { label: 'Moderator', icon: Shield, color: 'bg-blue-100 text-blue-800' },
   user: { label: 'User', icon: User, color: 'bg-gray-100 text-gray-800' },
@@ -52,16 +57,26 @@ const roleConfig = {
 
 export default function UsersSettingsPage() {
   const [users, setUsers] = useState<ForumUser[]>([]);
+  const [roles, setRoles] = useState<ForumRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await client.admin.users.$get({ query: {} });
-      if (res.ok) {
-        const data = await res.json();
+      const [usersRes, rolesRes] = await Promise.all([
+        client.admin.users.$get({ query: {} }),
+        client.admin.roles.$get(),
+      ]);
+
+      if (usersRes.ok) {
+        const data = await usersRes.json();
         setUsers(data as ForumUser[]);
+      }
+
+      if (rolesRes.ok) {
+        const data = await rolesRes.json();
+        setRoles(data as ForumRole[]);
       }
     } catch (err) {
       console.error('Failed to load users:', err);
@@ -80,7 +95,7 @@ export default function UsersSettingsPage() {
       u.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleChangeRole = async (userId: string, newRole: ForumUser['role']) => {
+  const handleChangeRole = async (userId: string, newRole: string) => {
     try {
       const res = await client.admin.users.role.$patch({
         json: { userId, role: newRole },
@@ -95,7 +110,12 @@ export default function UsersSettingsPage() {
   };
 
   const getRoleBadge = (role: ForumUser['role']) => {
-    const config = roleConfig[role];
+    const roleRecord = roles.find(item => item.id === role);
+    const config = roleConfig[role] ?? {
+      label: roleRecord?.name ?? role,
+      icon: Shield,
+      color: 'bg-emerald-100 text-emerald-800',
+    };
     const IconComponent = config.icon;
     return (
       <Badge variant="outline" className={config.color}>
@@ -193,27 +213,25 @@ export default function UsersSettingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Change Role</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => handleChangeRole(member.id, 'admin')}
-                            disabled={member.role === 'admin'}
-                          >
-                            <Crown className="w-4 h-4 mr-2" />
-                            Make Admin
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleChangeRole(member.id, 'moderator')}
-                            disabled={member.role === 'moderator'}
-                          >
-                            <Shield className="w-4 h-4 mr-2" />
-                            Make Moderator
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleChangeRole(member.id, 'user')}
-                            disabled={member.role === 'user'}
-                          >
-                            <User className="w-4 h-4 mr-2" />
-                            Make User
-                          </DropdownMenuItem>
+                          {roles.map((role) => {
+                            const config = roleConfig[role.id] ?? {
+                              label: role.name,
+                              icon: Shield,
+                              color: 'bg-emerald-100 text-emerald-800',
+                            };
+                            const IconComponent = config.icon;
+
+                            return (
+                              <DropdownMenuItem
+                                key={role.id}
+                                onClick={() => handleChangeRole(member.id, role.id)}
+                                disabled={member.role === role.id}
+                              >
+                                <IconComponent className="w-4 h-4 mr-2" />
+                                Make {config.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

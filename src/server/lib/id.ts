@@ -14,6 +14,11 @@ type PlatformModels =
   | 'vote'
   | 'reaction'
   | 'group'
+  | 'role'
+  | 'role_permission'
+  | 'category_role'
+  | 'user_group'
+  | 'category_group'
   | 'bookmark'
   | 'draft'
   | 'flag'
@@ -45,6 +50,11 @@ const prefixes: Record<string, string> = {
   vote: 'vote',
   reaction: 'react',
   group: 'grp',
+  role: 'role',
+  role_permission: 'rp',
+  category_role: 'cr',
+  user_group: 'ug',
+  category_group: 'cg',
   bookmark: 'bm',
   draft: 'draft',
   flag: 'flag',

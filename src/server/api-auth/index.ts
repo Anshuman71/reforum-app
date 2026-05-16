@@ -3,6 +3,7 @@ import { ReforumApiError } from '../errors';
 import { AuthedVariables } from '@/types';
 import {
   hasPermission,
+  hasRolePermission,
   type PermissionAction,
   type PermissionResource,
   type Role,
@@ -44,7 +45,7 @@ export function isAuthorized(
   }
 }
 
-export function requirePermission<Resource extends PermissionResource>(
+export async function requirePermission<Resource extends PermissionResource>(
   c: Context<{ Variables: AuthedVariables }>,
   resource: Resource,
   action: PermissionAction<Resource>
@@ -58,7 +59,7 @@ export function requirePermission<Resource extends PermissionResource>(
     });
   }
 
-  if (!hasPermission(user.role, resource, action)) {
+  if (!(await hasRolePermission(user.role, resource, action))) {
     throw new ReforumApiError({
       code: 'FORBIDDEN',
       message: 'Insufficient permissions to perform this action',
@@ -68,7 +69,7 @@ export function requirePermission<Resource extends PermissionResource>(
   return user;
 }
 
-export function requireActorPermission<Resource extends PermissionResource>(
+export async function requireActorPermission<Resource extends PermissionResource>(
   actor: { role: string } | null,
   resource: Resource,
   action: PermissionAction<Resource>
@@ -80,7 +81,7 @@ export function requireActorPermission<Resource extends PermissionResource>(
     });
   }
 
-  if (!hasPermission(actor.role, resource, action)) {
+  if (!(await hasRolePermission(actor.role, resource, action))) {
     throw new ReforumApiError({
       code: 'FORBIDDEN',
       message: 'Insufficient permissions to perform this action',

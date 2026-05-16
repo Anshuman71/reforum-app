@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 const settingsNavItems = [
   { id: 'categories', label: 'Categories', href: '/admin/settings/categories' },
   { id: 'users', label: 'Users', href: '/admin/settings/users' },
+  { id: 'roles', label: 'Roles', href: '/admin/settings/roles' },
+  { id: 'groups', label: 'Groups', href: '/admin/settings/groups' },
 ];
 
 export default function SettingsLayout({
