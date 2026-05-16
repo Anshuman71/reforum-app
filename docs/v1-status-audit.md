@@ -12,8 +12,8 @@ In practical terms:
 - S3-compatible storage with presigned direct uploads is implemented and working for both avatars and content images.
 - The Tiptap editor has been fully removed; the Slate-based editor is now the only rich text editor.
 - The legacy `content` field has been removed from posts and comments (replaced by `bodyMarkdown`/`bodyHtml`).
-- Email now has an adapter contract, shared auth-email utilities, and a Resend blueprint, but the default runtime config still uses noop email until provider env/config is enabled.
-- The biggest remaining gaps are email provider activation/config docs and product hardening around moderation, notifications, search, and revision history.
+- Email now has an adapter contract, shared auth-email utilities, a Resend blueprint, and env-driven provider selection.
+- The biggest remaining gaps are product hardening around moderation, notifications, search, and revision history.
 
 ## What Exists Today
 
@@ -29,7 +29,7 @@ In practical terms:
 - Thread detail rendering is now functional instead of placeholder-only.
 - The server no longer trusts client-sent authorship for post and comment creation.
 - Provider seams now exist for email and storage adapters.
-- Email has a reusable `sendEmail` adapter contract, a noop default adapter, shared verification/password-reset email utilities, and a Resend HTTP adapter blueprint.
+- Email has a reusable `sendEmail` adapter contract, a noop default adapter, shared verification/password-reset email utilities, a Resend HTTP adapter blueprint, and `EMAIL_PROVIDER`-driven selection in `reforum.config.ts`.
 - S3-compatible storage adapter with presigned direct uploads is implemented and production-ready.
 - Local storage adapter serves as the development fallback.
 - Avatar upload and content image upload flows are both implemented end-to-end.
@@ -103,7 +103,7 @@ That means:
 - usable for real iteration on discussion, auth, and media flows,
 - production-safe for file uploads on both S3 and local development paths,
 - platform storage, content model, and RBAC foundation are now in place,
-- still needing email provider activation/config docs, moderation polish, notifications, search, and revision history to close out V1 foundation work.
+- still needing moderation polish, notifications, search, and revision history to close out V1 foundation work.
 
 ## First Recommended Milestone
 
@@ -207,11 +207,10 @@ M2B is complete at the foundation level. RBAC is not the current blocker for V1 
 
 Recommended next sequence:
 
-1. Configure and document provider-backed transactional email through the existing email adapter.
-2. Polish moderation workflows: review/audit details, report outcomes, and notification hooks.
-3. Build in-app notifications that consume existing forum, moderation, role, and system events.
-4. Add basic Postgres search with private-category visibility enforcement.
-5. Continue RBAC hardening opportunistically by extracting heavier admin/category rules into services and broadening integration coverage.
+1. Polish moderation workflows: review/audit details, report outcomes, and notification hooks.
+2. Build in-app notifications that consume existing forum, moderation, role, and system events.
+3. Add basic Postgres search with private-category visibility enforcement.
+4. Continue RBAC hardening opportunistically by extracting heavier admin/category rules into services and broadening integration coverage.
 
 ## Next Target Milestone
 
@@ -223,7 +222,7 @@ Goal: replace the noop email path with a real provider adapter and prepare the e
 
 - [x] `E1` Add provider-backed transactional email through the existing email adapter boundary, with Resend as the planned default blueprint.
 - [x] `E2` Wire account verification and password reset delivery without hard-coding one owner policy.
-- [ ] `E3` Add configuration docs and environment validation for the email provider.
+- [x] `E3` Add configuration docs and environment validation for the email provider.
 - [ ] `E4` Start the notification foundation by mapping existing forum, moderation, role, and system events to notification candidates.
 - [ ] `E5` Keep durable queues and digest workflows deferred unless deployment constraints require them.
 

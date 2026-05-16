@@ -1,7 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createEmailAdapterFromEnv } from '@/server/adapters/email/config';
 import { createPasswordResetEmail } from '@/server/adapters/email/auth';
 import { resendEmailAdapter } from '@/server/adapters/email/resend';
 import { htmlToText } from '@/server/adapters/email/utils';
+
+vi.mock('server-only', () => ({}));
+
+const originalEnv = { ...process.env };
+
+afterEach(() => {
+  process.env = { ...originalEnv };
+});
 
 describe('email utilities', () => {
   it('derives text from simple html email bodies', () => {
@@ -20,6 +29,40 @@ describe('email utilities', () => {
     expect(email.subject).toBe('Reset your password');
     expect(email.html).toContain('https://example.com/reset');
     expect(email.text).toContain('Reset password');
+  });
+});
+
+describe('email config', () => {
+  it('uses noop email by default', async () => {
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/reforum';
+    process.env.BETTER_AUTH_SECRET = 'secret';
+    process.env.ADMIN_EMAIL = 'admin@example.com';
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL = 'http://localhost:3000';
+    delete process.env.EMAIL_PROVIDER;
+
+    const adapter = createEmailAdapterFromEnv();
+
+    await expect(
+      adapter.sendEmail({
+        to: 'user@example.com',
+        subject: 'Hello',
+        text: 'Hello',
+      })
+    ).resolves.toEqual({ provider: 'noop' });
+  });
+
+  it('selects resend from env when requested', async () => {
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/reforum';
+    process.env.BETTER_AUTH_SECRET = 'secret';
+    process.env.ADMIN_EMAIL = 'admin@example.com';
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL = 'http://localhost:3000';
+    process.env.EMAIL_PROVIDER = 'resend';
+    process.env.RESEND_API_KEY = 'test-key';
+    process.env.EMAIL_FROM = 'Reforum <hello@example.com>';
+
+    const adapter = createEmailAdapterFromEnv();
+
+    expect(adapter).toHaveProperty('sendEmail');
   });
 });
 

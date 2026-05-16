@@ -11,6 +11,7 @@ const EnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string(),
   ADMIN_EMAIL: z.email(),
   NEXT_PUBLIC_BETTER_AUTH_URL: z.string(),
+  EMAIL_PROVIDER: z.enum(["noop", "resend"]).optional(),
 });
 
 export type env = z.infer<typeof EnvSchema>;

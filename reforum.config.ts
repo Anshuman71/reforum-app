@@ -2,7 +2,7 @@ import { defineConfig } from "@/server/lib/config";
 import { pollingAdapter } from "@/server/adapters/realtime/polling";
 import { s3CompatibleStorageAdapter } from "@/server/adapters/storage/s3";
 import { consoleAnalytics } from "@/server/adapters/analytics/console";
-import { noopEmailAdapter } from "@/server/adapters/email/noop";
+import { createEmailAdapterFromEnv } from "@/server/adapters/email/config";
 import { getEnvs, getS3Envs } from "@/server/lib/envs";
 
 getEnvs();
@@ -22,5 +22,5 @@ export default defineConfig({
   realtime: pollingAdapter(),
   storage,
   analytics: consoleAnalytics(),
-  email: noopEmailAdapter(),
+  email: createEmailAdapterFromEnv(),
 });

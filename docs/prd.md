@@ -28,7 +28,7 @@ Reforum is in mid Stage 2. The app has moved beyond scaffolding and has a workin
 The biggest remaining gaps are product hardening gaps, not basic forum flow gaps:
 
 - RBAC is complete at the V1 foundation level, but downstream features still need to consume the permission model consistently.
-- Email now has a reusable adapter contract, shared auth-email utilities, and a Resend HTTP adapter blueprint; the default runtime config still uses the noop adapter until provider env/config is enabled.
+- Email now has a reusable adapter contract, shared auth-email utilities, a Resend HTTP adapter blueprint, and env-driven provider selection.
 - Notifications exist in schema/event direction but not as a complete user-facing product.
 - Moderation now has reports, queue review, and action APIs/UI, but still needs workflow polish and notification outcomes.
 - Strict modular boundary enforcement is still a future architecture task.
@@ -293,7 +293,7 @@ Post-RBAC product hardening.
 
 Acceptance criteria:
 
-- Transactional email provider can be integrated behind the email adapter; the Resend blueprint exists and runtime activation remains config-driven.
+- Transactional email provider can be integrated behind the email adapter; Resend activation is config-driven through `EMAIL_PROVIDER=resend`.
 - Moderation workflows are polished beyond the foundation queue/action flow.
 - In-app notifications consume forum, moderation, role, and system events.
 - Search respects private category visibility and permission rules.
@@ -301,14 +301,13 @@ Acceptance criteria:
 
 ### Next
 
-1. Configure and document the Resend adapter path in `reforum.config.ts`/environment docs.
-2. Moderation workflow polish, including outcome notifications and review/audit details.
-3. In-app notification center and event-to-notification defaults.
-4. Basic Postgres search with private-category visibility enforcement.
-5. Post/comment revision history.
-6. Modular boundary linting and future extensibility hooks.
-7. ~~Slate-based Markdown-first editor migration.~~ Done: Slate editor is active; content is stored as Markdown (canonical) and HTML (derived).
-8. ~~Private category visibility scope spike.~~ Done at the RBAC foundation level with role/group category audiences.
+1. Moderation workflow polish, including outcome notifications and review/audit details.
+2. In-app notification center and event-to-notification defaults.
+3. Basic Postgres search with private-category visibility enforcement.
+4. Post/comment revision history.
+5. Modular boundary linting and future extensibility hooks.
+6. ~~Slate-based Markdown-first editor migration.~~ Done: Slate editor is active; content is stored as Markdown (canonical) and HTML (derived).
+7. ~~Private category visibility scope spike.~~ Done at the RBAC foundation level with role/group category audiences.
 
 ## Open Product Decisions
 

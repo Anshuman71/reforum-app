@@ -4,7 +4,7 @@ Reforum is a self-hosted, single-community forum starter kit built with Next.js,
 
 ## Email Adapter
 
-The default local configuration uses `noopEmailAdapter()`, so auth emails are intentionally not sent until a provider adapter is configured.
+The default local configuration uses `noopEmailAdapter()`, so auth emails are intentionally not sent until a provider adapter is selected.
 
 The email boundary lives in `src/server/adapters/email`:
 
@@ -18,26 +18,23 @@ The email boundary lives in `src/server/adapters/email`:
 To use the Resend adapter, configure these environment variables:
 
 ```bash
+EMAIL_PROVIDER="resend"
 RESEND_API_KEY="re_..."
 EMAIL_FROM="Reforum <hello@example.com>"
 ```
 
+`EMAIL_PROVIDER` is optional and defaults to `noop`. Set it to `resend` to enable Resend delivery.
+
 `RESEND_API_KEY` is the API key from Resend. `EMAIL_FROM` must use a sender/domain verified in Resend.
 
-Then update `reforum.config.ts` to use the Resend adapter:
+`reforum.config.ts` selects the adapter from env:
 
 ```ts
-import { resendEmailAdapter } from "@/server/adapters/email/resend";
-import { getResendEmailEnvs } from "@/server/lib/envs";
-
-const resendEnvs = getResendEmailEnvs();
+import { createEmailAdapterFromEnv } from "@/server/adapters/email/config";
 
 export default defineConfig({
   // ...
-  email: resendEmailAdapter({
-    apiKey: resendEnvs.RESEND_API_KEY,
-    defaultFrom: resendEnvs.EMAIL_FROM,
-  }),
+  email: createEmailAdapterFromEnv(),
 });
 ```
 
